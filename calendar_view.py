@@ -1,12 +1,13 @@
 """
 Todo List 應用程式 - 月曆視圖
-版本: v1.0.4
+版本: v1.0.5
 建立日期: 2024-01-XX
 更新: 
   - v1.0.1: 修正日期計算錯誤和版面對齊問題
   - v1.0.2: 週日移到最左側、日期加英文簡寫、顏色區分、今日任務顯示
   - v1.0.3: 移除日期格子中的英文縮寫，只保留標題；修正對齊問題
   - v1.0.4: 修正日期上下對齊問題；今日任務分為未完成和已完成兩部分
+  - v1.0.5: 修正二月、三月等月份變窄的問題，確保所有月份寬度一致
 """
 
 import tkinter as tk
@@ -60,7 +61,7 @@ class CalendarView:
         
         # 建立一個容器框架來包含星期標題和月曆網格，確保對齊
         calendar_container = ttk.Frame(self.frame)
-        calendar_container.pack(pady=10)
+        calendar_container.pack(pady=10, fill=tk.BOTH, expand=False)
         
         # 星期標題（週日在最左側）- 使用 grid 以確保對齊
         weekdays_frame = ttk.Frame(calendar_container)
@@ -82,8 +83,8 @@ class CalendarView:
         self.calendar_frame = ttk.Frame(calendar_container)
         self.calendar_frame.grid(row=1, column=0, sticky="ew")
         
-        # 設定容器框架的欄位權重
-        calendar_container.columnconfigure(0, weight=1)
+        # 設定容器框架的欄位權重，並確保有最小寬度
+        calendar_container.columnconfigure(0, weight=1, minsize=700)
         
         # 今日任務區域
         self.today_tasks_frame = ttk.LabelFrame(self.frame, text="今日任務", padding=10)
@@ -201,9 +202,20 @@ class CalendarView:
                 col = 0
                 row += 1
         
+        # 填充最後一行的空白格子，確保每行都有7個格子
+        while col < 7:
+            empty_label = ttk.Label(self.calendar_frame, text="")
+            empty_label.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+            col += 1
+        
         # 設定欄位權重，讓按鈕均勻分佈（與星期標題使用相同的 uniform 名稱以確保對齊）
+        # 確保所有行都使用相同的設定
         for i in range(7):
             self.calendar_frame.columnconfigure(i, weight=1, uniform="calendar_col")
+        
+        # 確保容器框架有最小寬度，避免月份天數少時變窄
+        self.calendar_frame.update_idletasks()
+        calendar_container.update_idletasks()
         
         # 更新今日任務顯示
         self._update_today_tasks()
