@@ -60,11 +60,11 @@ class CalendarView:
         next_btn.pack(side=tk.LEFT, padx=5)
         
         # 建立一個容器框架來包含星期標題和月曆網格，確保對齊
-        calendar_container = ttk.Frame(self.frame)
-        calendar_container.pack(pady=10, fill=tk.BOTH, expand=False)
+        self.calendar_container = ttk.Frame(self.frame)
+        self.calendar_container.pack(pady=10, fill=tk.BOTH, expand=False)
         
         # 星期標題（週日在最左側）- 使用 grid 以確保對齊
-        weekdays_frame = ttk.Frame(calendar_container)
+        weekdays_frame = ttk.Frame(self.calendar_container)
         weekdays_frame.grid(row=0, column=0, sticky="ew")
         
         # 週日移到最左側：["日", "一", "二", "三", "四", "五", "六"]
@@ -80,11 +80,11 @@ class CalendarView:
             weekdays_frame.columnconfigure(i, weight=1, uniform="calendar_col")
         
         # 月曆網格
-        self.calendar_frame = ttk.Frame(calendar_container)
+        self.calendar_frame = ttk.Frame(self.calendar_container)
         self.calendar_frame.grid(row=1, column=0, sticky="ew")
         
         # 設定容器框架的欄位權重，並確保有最小寬度
-        calendar_container.columnconfigure(0, weight=1, minsize=700)
+        self.calendar_container.columnconfigure(0, weight=1, minsize=700)
         
         # 今日任務區域
         self.today_tasks_frame = ttk.LabelFrame(self.frame, text="今日任務", padding=10)
@@ -215,7 +215,7 @@ class CalendarView:
         
         # 確保容器框架有最小寬度，避免月份天數少時變窄
         self.calendar_frame.update_idletasks()
-        calendar_container.update_idletasks()
+        self.calendar_container.update_idletasks()
         
         # 更新今日任務顯示
         self._update_today_tasks()
