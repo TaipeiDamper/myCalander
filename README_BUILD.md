@@ -2,29 +2,24 @@
 
 ## 使用 uv 管理專案
 
-### 初始化專案（如果尚未初始化）
+### 安裝 PyInstaller（如果尚未安裝）
 ```bash
-uv init
-```
-
-### 安裝依賴
-```bash
-uv sync
-```
-
-### 安裝開發依賴（包含 PyInstaller）
-```bash
-uv add --dev pyinstaller
+uv pip install pyinstaller
 ```
 
 ## 打包成 exe
 
 ### 方法 1: 使用提供的腳本
 ```bash
-uv run python build_exe.py
+python build_exe.py
 ```
 
 ### 方法 2: 直接使用 PyInstaller
+```bash
+pyinstaller --name=TodoListCalendar --onefile --windowed main.py
+```
+
+### 方法 3: 使用 uv 執行（如果已安裝在虛擬環境中）
 ```bash
 uv run pyinstaller --name=TodoListCalendar --onefile --windowed main.py
 ```
