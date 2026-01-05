@@ -1,11 +1,12 @@
 """
 Todo List 應用程式 - 月曆視圖
-版本: v1.0.3
+版本: v1.0.4
 建立日期: 2024-01-XX
 更新: 
   - v1.0.1: 修正日期計算錯誤和版面對齊問題
   - v1.0.2: 週日移到最左側、日期加英文簡寫、顏色區分、今日任務顯示
   - v1.0.3: 移除日期格子中的英文縮寫，只保留標題；修正對齊問題
+  - v1.0.4: 修正日期上下對齊問題；今日任務分為未完成和已完成兩部分
 """
 
 import tkinter as tk
@@ -57,9 +58,13 @@ class CalendarView:
         next_btn = ttk.Button(header_frame, text="▶", width=3, command=self._next_month)
         next_btn.pack(side=tk.LEFT, padx=5)
         
+        # 建立一個容器框架來包含星期標題和月曆網格，確保對齊
+        calendar_container = ttk.Frame(self.frame)
+        calendar_container.pack(pady=10)
+        
         # 星期標題（週日在最左側）- 使用 grid 以確保對齊
-        weekdays_frame = ttk.Frame(self.frame)
-        weekdays_frame.pack(pady=5)
+        weekdays_frame = ttk.Frame(calendar_container)
+        weekdays_frame.grid(row=0, column=0, sticky="ew")
         
         # 週日移到最左側：["日", "一", "二", "三", "四", "五", "六"]
         weekdays = ["日", "一", "二", "三", "四", "五", "六"]
@@ -67,15 +72,18 @@ class CalendarView:
         for i, day in enumerate(weekdays):
             label_text = f"{day}\n{weekday_abbr[i]}"
             label = ttk.Label(weekdays_frame, text=label_text, anchor="center", font=("Arial", 9))
-            label.grid(row=0, column=i, padx=2, sticky="nsew")
+            label.grid(row=0, column=i, padx=2, pady=2, sticky="nsew")
         
         # 設定星期標題欄位權重（與月曆網格一致，使用相同的 uniform 名稱）
         for i in range(7):
             weekdays_frame.columnconfigure(i, weight=1, uniform="calendar_col")
         
         # 月曆網格
-        self.calendar_frame = ttk.Frame(self.frame)
-        self.calendar_frame.pack(pady=10)
+        self.calendar_frame = ttk.Frame(calendar_container)
+        self.calendar_frame.grid(row=1, column=0, sticky="ew")
+        
+        # 設定容器框架的欄位權重
+        calendar_container.columnconfigure(0, weight=1)
         
         # 今日任務區域
         self.today_tasks_frame = ttk.LabelFrame(self.frame, text="今日任務", padding=10)
@@ -210,23 +218,33 @@ class CalendarView:
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%d")
         
-        # 取得今日的任務
-        today_todos = [t for t in self.todos if t.date == today_str and not t.completed]
+        # 取得今日的任務（分為未完成和已完成）
+        today_todos_all = [t for t in self.todos if t.date == today_str]
+        today_todos_incomplete = [t for t in today_todos_all if not t.completed]
+        today_todos_completed = [t for t in today_todos_all if t.completed]
         
-        if not today_todos:
-            # 沒有任務
+        # 排序任務（按時間）
+        today_todos_incomplete = sorted(today_todos_incomplete)
+        today_todos_completed = sorted(today_todos_completed)
+        
+        # 建立主容器（使用 grid 來分上下兩部分）
+        main_container = ttk.Frame(self.today_tasks_frame)
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 上半部分：未完成任務
+        incomplete_frame = ttk.LabelFrame(main_container, text="未完成任務", padding=5)
+        incomplete_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        
+        if not today_todos_incomplete:
             no_task_label = ttk.Label(
-                self.today_tasks_frame, 
-                text="今天沒有待完成的任務",
+                incomplete_frame, 
+                text="沒有待完成的任務",
                 foreground="gray"
             )
             no_task_label.pack(pady=10)
         else:
-            # 排序任務（按時間）
-            today_todos = sorted(today_todos)
-            
             # 建立任務列表框架（含滾動條）
-            list_frame = ttk.Frame(self.today_tasks_frame)
+            list_frame = ttk.Frame(incomplete_frame)
             list_frame.pack(fill=tk.BOTH, expand=True)
             
             # 滾動條
@@ -243,13 +261,57 @@ class CalendarView:
             task_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.config(command=task_listbox.yview)
             
-            # 加入任務到列表
-            for todo in today_todos:
+            # 加入未完成任務到列表
+            for todo in today_todos_incomplete:
                 time_str = todo.time if todo.time else "全天"
                 task_text = f"[{time_str}] {todo.title}"
                 if todo.content:
                     task_text += f" - {todo.content[:30]}"
                 task_listbox.insert(tk.END, task_text)
+        
+        # 下半部分：已完成任務
+        completed_frame = ttk.LabelFrame(main_container, text="已完成任務", padding=5)
+        completed_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        
+        if not today_todos_completed:
+            no_completed_label = ttk.Label(
+                completed_frame, 
+                text="沒有已完成的任務",
+                foreground="gray"
+            )
+            no_completed_label.pack(pady=10)
+        else:
+            # 建立任務列表框架（含滾動條）
+            list_frame2 = ttk.Frame(completed_frame)
+            list_frame2.pack(fill=tk.BOTH, expand=True)
+            
+            # 滾動條
+            scrollbar2 = ttk.Scrollbar(list_frame2)
+            scrollbar2.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # 任務列表
+            task_listbox2 = tk.Listbox(
+                list_frame2,
+                yscrollcommand=scrollbar2.set,
+                font=("Arial", 10),
+                selectmode=tk.SINGLE,
+                foreground="gray"
+            )
+            task_listbox2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar2.config(command=task_listbox2.yview)
+            
+            # 加入已完成任務到列表
+            for todo in today_todos_completed:
+                time_str = todo.time if todo.time else "全天"
+                task_text = f"[{time_str}] ✓ {todo.title}"
+                if todo.content:
+                    task_text += f" - {todo.content[:30]}"
+                task_listbox2.insert(tk.END, task_text)
+        
+        # 設定主容器的行權重
+        main_container.rowconfigure(0, weight=1)
+        main_container.rowconfigure(1, weight=1)
+        main_container.columnconfigure(0, weight=1)
     
     def update_todos(self, todos: List[Todo]):
         """更新 todo 列表並刷新月曆"""

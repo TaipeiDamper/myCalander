@@ -82,3 +82,4 @@ def get_incomplete_todos(todos: List[Todo]) -> List[Todo]:
     incomplete = [todo for todo in todos if not todo.completed]
     return sorted(incomplete)
 
+

@@ -1,8 +1,10 @@
 """
 Todo List 應用程式 - 主程式
-版本: v1.0.1
+版本: v1.0.2
 建立日期: 2024-01-XX
-更新: 調整視窗大小以容納今日任務顯示
+更新: 
+  - v1.0.1: 調整視窗大小以容納今日任務顯示
+  - v1.0.2: 新增完成/未完成切換功能
 """
 
 import tkinter as tk
@@ -74,6 +76,7 @@ class TodoApp:
             on_add=self._on_add_todo,
             on_edit=self._on_edit_todo,
             on_delete=self._on_delete_todo,
+            on_toggle_complete=self._on_toggle_complete,
             on_back=self.show_calendar_view,
             selected_date=date
         )
@@ -122,6 +125,10 @@ class TodoApp:
         if result:
             self.todos.remove(todo)
             self._save_and_refresh()
+    
+    def _on_toggle_complete(self, todo: Todo):
+        """處理切換完成狀態事件"""
+        self._save_and_refresh()
     
     def _save_and_refresh(self):
         """儲存資料並刷新視圖"""

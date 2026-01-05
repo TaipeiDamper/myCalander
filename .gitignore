@@ -34,3 +34,14 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# PyInstaller
+*.spec
+build/
+dist/
+*.exe
+
+# uv
+.venv/
+uv.lock
+
+

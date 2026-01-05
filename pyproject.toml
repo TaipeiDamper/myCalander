@@ -1,0 +1,10 @@
+[project]
+name = "todo-list-calendar"
+version = "1.0.0"
+description = "Todo List 月曆應用程式"
+requires-python = ">=3.7"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
