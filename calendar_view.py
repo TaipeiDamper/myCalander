@@ -1,7 +1,8 @@
 """
 Todo List 應用程式 - 月曆視圖
-版本: v1.0.0
+版本: v1.0.1
 建立日期: 2024-01-XX
+更新: 修正日期計算錯誤和版面對齊問題
 """
 
 import tkinter as tk
@@ -59,7 +60,7 @@ class CalendarView:
         
         weekdays = ["一", "二", "三", "四", "五", "六", "日"]
         for day in weekdays:
-            label = ttk.Label(weekdays_frame, text=day, width=10, anchor="center")
+            label = ttk.Label(weekdays_frame, text=day, width=12, anchor="center")
             label.pack(side=tk.LEFT, padx=2)
         
         # 月曆網格
@@ -96,9 +97,12 @@ class CalendarView:
         for widget in self.calendar_frame.winfo_children():
             widget.destroy()
         
-        # 計算月份的第一天是星期幾（一=0, 日=6）
+        # 計算月份的第一天是星期幾
+        # Python weekday(): Monday=0, Tuesday=1, ..., Sunday=6
+        # 我們的星期標題：["一", "二", "三", "四", "五", "六", "日"]
+        # 所以 Monday=0 對應 "一"=0, Sunday=6 對應 "日"=6
         first_day = self.current_date.replace(day=1)
-        weekday = (first_day.weekday() + 1) % 7  # 轉換為一=0, 日=6
+        weekday = first_day.weekday()  # 直接使用，Monday=0 對應第一列
         
         # 計算月份有多少天
         if self.current_date.month == 12:
@@ -109,11 +113,12 @@ class CalendarView:
         
         # 建立日期按鈕
         row = 0
-        col = weekday
+        col = 0
         
-        # 填充前面的空白
+        # 填充前面的空白（從第一列開始）
         for _ in range(weekday):
-            ttk.Label(self.calendar_frame, text="", width=10).grid(row=row, column=col, padx=2, pady=2)
+            empty_label = ttk.Label(self.calendar_frame, text="", width=12)
+            empty_label.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
             col += 1
         
         # 建立日期按鈕
@@ -132,21 +137,23 @@ class CalendarView:
                 btn = tk.Button(
                     self.calendar_frame,
                     text=btn_text,
-                    width=10,
+                    width=12,
                     height=3,
                     command=lambda d=date_str: self.on_date_click(d),
                     bg="#e3f2fd",
-                    relief=tk.RAISED
+                    relief=tk.RAISED,
+                    anchor="n"
                 )
             else:
                 # 沒有 todo 的日期
                 btn = tk.Button(
                     self.calendar_frame,
                     text=str(day),
-                    width=10,
+                    width=12,
                     height=3,
                     command=lambda d=date_str: self.on_date_click(d),
-                    relief=tk.RAISED
+                    relief=tk.RAISED,
+                    anchor="center"
                 )
             
             # 如果是今天，標記顏色
@@ -156,12 +163,16 @@ class CalendarView:
                 day == today.day):
                 btn.config(bg="#fff9c4")
             
-            btn.grid(row=row, column=col, padx=2, pady=2)
+            btn.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
             
             col += 1
             if col > 6:
                 col = 0
                 row += 1
+        
+        # 設定欄位權重，讓按鈕均勻分佈
+        for i in range(7):
+            self.calendar_frame.columnconfigure(i, weight=1, uniform="calendar_col")
     
     def update_todos(self, todos: List[Todo]):
         """更新 todo 列表並刷新月曆"""
@@ -171,4 +182,5 @@ class CalendarView:
     def get_frame(self) -> ttk.Frame:
         """取得框架元件"""
         return self.frame
+
 
