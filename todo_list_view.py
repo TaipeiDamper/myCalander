@@ -1,7 +1,10 @@
 """
 Todo List 應用程式 - Todo 列表視圖
-版本: v1.0.0
+版本: v1.0.2
 建立日期: 2024-01-XX
+更新: 
+  - v1.0.1: 移除拖曳功能，新增完成/未完成切換功能
+  - v1.0.2: 完全移除拖曳相關程式碼和標示
 """
 
 import tkinter as tk
@@ -18,6 +21,7 @@ class TodoListView:
                  on_add: Callable[[], None],
                  on_edit: Callable[[Todo], None],
                  on_delete: Callable[[Todo], None],
+                 on_toggle_complete: Callable[[Todo], None],
                  on_back: Callable[[], None],
                  selected_date: Optional[str] = None):
         """
@@ -37,6 +41,7 @@ class TodoListView:
         self.on_add = on_add
         self.on_edit = on_edit
         self.on_delete = on_delete
+        self.on_toggle_complete = on_toggle_complete
         self.on_back = on_back
         self.selected_date = selected_date
         
@@ -76,7 +81,7 @@ class TodoListView:
         scrollbar = ttk.Scrollbar(list_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 列表框（使用 Canvas 實現拖曳功能）
+        # 列表框（使用 Canvas 實現滾動功能）
         self.canvas = tk.Canvas(list_frame, yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.canvas.yview)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -90,10 +95,6 @@ class TodoListView:
         # 綁定滾動事件
         self.inner_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
-        
-        # 拖曳相關變數
-        self.drag_start_y = None
-        self.dragged_item = None
         
         # 更新列表
         self._update_list()
@@ -115,14 +116,18 @@ class TodoListView:
         
         # 取得要顯示的 todos
         if self.selected_date:
-            # 顯示選中日期的 todos
+            # 顯示選中日期的 todos（包含已完成和未完成）
             display_todos = [t for t in self.todos if t.date == self.selected_date]
         else:
             # 顯示所有未完成的 todos
             display_todos = [t for t in self.todos if not t.completed]
         
-        # 排序（越接近完成時刻越前面）
-        display_todos = sorted(display_todos)
+        # 排序：未完成的按時間排序（越接近完成時刻越前面），已完成的放在最後
+        incomplete = [t for t in display_todos if not t.completed]
+        completed = [t for t in display_todos if t.completed]
+        incomplete = sorted(incomplete)
+        completed = sorted(completed)
+        display_todos = incomplete + completed
         
         # 建立 todo 項目
         for idx, todo in enumerate(display_todos):
@@ -133,34 +138,56 @@ class TodoListView:
         item_frame = ttk.Frame(self.inner_frame, relief=tk.RAISED, borderwidth=1)
         item_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 左側：拖曳手柄
-        drag_handle = ttk.Label(item_frame, text="☰", cursor="hand2")
-        drag_handle.pack(side=tk.LEFT, padx=5)
-        drag_handle.bind("<Button-1>", lambda e, t=todo: self._start_drag(e, t))
-        drag_handle.bind("<B1-Motion>", lambda e, t=todo: self._on_drag(e, t))
-        drag_handle.bind("<ButtonRelease-1>", lambda e: self._end_drag(e))
+        # 左側：完成狀態核取方塊
+        complete_var = tk.BooleanVar(value=todo.completed)
+        complete_checkbox = ttk.Checkbutton(
+            item_frame,
+            variable=complete_var,
+            command=lambda t=todo, v=complete_var: self._on_toggle_complete(t, v)
+        )
+        complete_checkbox.pack(side=tk.LEFT, padx=5)
         
         # 中間：todo 資訊
         info_frame = ttk.Frame(item_frame)
         info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 標題
-        title_label = ttk.Label(
-            info_frame, 
-            text=todo.title, 
-            font=("Arial", 10, "bold"),
-            anchor="w"
-        )
+        # 標題（如果已完成，加上刪除線效果）
+        title_text = todo.title
+        if todo.completed:
+            title_text = f"✓ {title_text}"
+            title_label = ttk.Label(
+                info_frame, 
+                text=title_text, 
+                font=("Arial", 10, "bold", "overstrike"),
+                anchor="w",
+                foreground="gray"
+            )
+        else:
+            title_label = ttk.Label(
+                info_frame, 
+                text=title_text, 
+                font=("Arial", 10, "bold"),
+                anchor="w"
+            )
         title_label.pack(fill=tk.X)
         
         # 內容（如果有）
         if todo.content:
-            content_label = ttk.Label(
-                info_frame, 
-                text=todo.content[:50] + ("..." if len(todo.content) > 50 else ""),
-                anchor="w",
-                foreground="gray"
-            )
+            content_text = todo.content[:50] + ("..." if len(todo.content) > 50 else "")
+            if todo.completed:
+                content_label = ttk.Label(
+                    info_frame, 
+                    text=content_text,
+                    anchor="w",
+                    foreground="lightgray"
+                )
+            else:
+                content_label = ttk.Label(
+                    info_frame, 
+                    text=content_text,
+                    anchor="w",
+                    foreground="gray"
+                )
             content_label.pack(fill=tk.X)
         
         # 日期時間
@@ -172,12 +199,20 @@ class TodoListView:
                 datetime_str += f" {todo.time}"
         
         if datetime_str:
-            datetime_label = ttk.Label(
-                info_frame, 
-                text=datetime_str,
-                anchor="w",
-                foreground="blue"
-            )
+            if todo.completed:
+                datetime_label = ttk.Label(
+                    info_frame, 
+                    text=datetime_str,
+                    anchor="w",
+                    foreground="lightblue"
+                )
+            else:
+                datetime_label = ttk.Label(
+                    info_frame, 
+                    text=datetime_str,
+                    anchor="w",
+                    foreground="blue"
+                )
             datetime_label.pack(fill=tk.X)
         
         # 右側：操作按鈕
@@ -205,34 +240,10 @@ class TodoListView:
         for widget in [item_frame, info_frame, title_label]:
             widget.bind("<Double-Button-1>", lambda e, t=todo: self.on_edit(t))
     
-    def _start_drag(self, event, todo: Todo):
-        """開始拖曳"""
-        self.drag_start_y = event.y_root
-        self.dragged_item = todo
-    
-    def _on_drag(self, event, todo: Todo):
-        """拖曳中"""
-        if self.dragged_item is None:
-            return
-        
-        # 計算移動方向
-        delta_y = event.y_root - self.drag_start_y
-        
-        # 這裡可以實作視覺反饋（例如高亮目標位置）
-        # 簡化版本：僅更新 order 值
-        pass
-    
-    def _end_drag(self, event):
-        """結束拖曳"""
-        if self.dragged_item is None:
-            return
-        
-        # 這裡可以實作實際的重新排序邏輯
-        # 簡化版本：根據拖曳距離調整 order
-        # 實際應用中需要更複雜的邏輯來確定新位置
-        
-        self.drag_start_y = None
-        self.dragged_item = None
+    def _on_toggle_complete(self, todo: Todo, var: tk.BooleanVar):
+        """切換完成狀態"""
+        todo.completed = var.get()
+        self.on_toggle_complete(todo)
     
     def update_todos(self, todos: List[Todo], selected_date: Optional[str] = None):
         """更新 todo 列表"""
@@ -244,4 +255,5 @@ class TodoListView:
     def get_frame(self) -> ttk.Frame:
         """取得框架元件"""
         return self.frame
+
 

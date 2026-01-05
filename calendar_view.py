@@ -1,10 +1,11 @@
 """
 Todo List 應用程式 - 月曆視圖
-版本: v1.0.2
+版本: v1.0.3
 建立日期: 2024-01-XX
 更新: 
   - v1.0.1: 修正日期計算錯誤和版面對齊問題
   - v1.0.2: 週日移到最左側、日期加英文簡寫、顏色區分、今日任務顯示
+  - v1.0.3: 移除日期格子中的英文縮寫，只保留標題；修正對齊問題
 """
 
 import tkinter as tk
@@ -56,7 +57,7 @@ class CalendarView:
         next_btn = ttk.Button(header_frame, text="▶", width=3, command=self._next_month)
         next_btn.pack(side=tk.LEFT, padx=5)
         
-        # 星期標題（週日在最左側）
+        # 星期標題（週日在最左側）- 使用 grid 以確保對齊
         weekdays_frame = ttk.Frame(self.frame)
         weekdays_frame.pack(pady=5)
         
@@ -65,8 +66,12 @@ class CalendarView:
         weekday_abbr = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
         for i, day in enumerate(weekdays):
             label_text = f"{day}\n{weekday_abbr[i]}"
-            label = ttk.Label(weekdays_frame, text=label_text, width=12, anchor="center", font=("Arial", 9))
-            label.pack(side=tk.LEFT, padx=2)
+            label = ttk.Label(weekdays_frame, text=label_text, anchor="center", font=("Arial", 9))
+            label.grid(row=0, column=i, padx=2, sticky="nsew")
+        
+        # 設定星期標題欄位權重（與月曆網格一致，使用相同的 uniform 名稱）
+        for i in range(7):
+            weekdays_frame.columnconfigure(i, weight=1, uniform="calendar_col")
         
         # 月曆網格
         self.calendar_frame = ttk.Frame(self.frame)
@@ -99,14 +104,6 @@ class CalendarView:
             self.current_date = self.current_date.replace(month=self.current_date.month + 1)
         self.month_label.config(text=self._get_month_year_str())
         self._update_calendar()
-    
-    def _get_weekday_abbr(self, date_obj: datetime) -> str:
-        """取得星期英文簡寫"""
-        abbr_map = {
-            0: "MON", 1: "TUE", 2: "WED", 3: "THU", 
-            4: "FRI", 5: "SAT", 6: "SUN"
-        }
-        return abbr_map[date_obj.weekday()]
     
     def _update_calendar(self):
         """更新月曆顯示"""
@@ -147,7 +144,6 @@ class CalendarView:
         for day in range(1, days_in_month + 1):
             date_obj = first_day.replace(day=day)
             date_str = date_obj.strftime("%Y-%m-%d")
-            weekday_abbr = self._get_weekday_abbr(date_obj)
             
             # 檢查這一天是否有 todo
             day_todos = [t for t in self.todos if t.date == date_str and not t.completed]
@@ -157,26 +153,25 @@ class CalendarView:
                        self.current_date.month == today.month and 
                        day == today.day)
             
-            # 建立按鈕文字（日期 + 英文簡寫）
+            # 建立按鈕文字（只顯示日期數字，不顯示英文縮寫）
             if day_todos:
                 # 有 todo 的日期
-                btn_text = f"{day}\n{weekday_abbr}\n{day_todos[0].title[:6]}"
+                btn_text = f"{day}\n{day_todos[0].title[:6]}"
                 if len(day_todos) > 1:
                     btn_text += f"\n(+{len(day_todos)-1})"
             else:
                 # 沒有 todo 的日期
-                btn_text = f"{day}\n{weekday_abbr}"
+                btn_text = str(day)
             
             # 建立按鈕
             btn = tk.Button(
                 self.calendar_frame,
                 text=btn_text,
-                width=12,
                 height=4,
                 command=lambda d=date_str: self.on_date_click(d),
                 relief=tk.RAISED,
-                anchor="n",
-                font=("Arial", 9)
+                anchor="center",
+                font=("Arial", 10)
             )
             
             # 設定顏色
@@ -198,7 +193,7 @@ class CalendarView:
                 col = 0
                 row += 1
         
-        # 設定欄位權重，讓按鈕均勻分佈
+        # 設定欄位權重，讓按鈕均勻分佈（與星期標題使用相同的 uniform 名稱以確保對齊）
         for i in range(7):
             self.calendar_frame.columnconfigure(i, weight=1, uniform="calendar_col")
         
