@@ -1,10 +1,11 @@
 """
 Todo List 應用程式 - Todo 列表視圖
-版本: v1.0.2
+版本: v1.0.3
 建立日期: 2024-01-XX
 更新: 
   - v1.0.1: 移除拖曳功能，新增完成/未完成切換功能
   - v1.0.2: 完全移除拖曳相關程式碼和標示
+  - v1.0.3: 新增任務時傳遞選中的日期作為預設值
 """
 
 import tkinter as tk
@@ -18,7 +19,7 @@ class TodoListView:
     """Todo 列表視圖"""
     
     def __init__(self, parent, todos: List[Todo], 
-                 on_add: Callable[[], None],
+                 on_add: Callable[[Optional[str]], None],
                  on_edit: Callable[[Todo], None],
                  on_delete: Callable[[Todo], None],
                  on_toggle_complete: Callable[[Todo], None],
@@ -30,7 +31,7 @@ class TodoListView:
         Args:
             parent: 父容器
             todos: 所有 todo 列表
-            on_add: 新增 todo 回調
+            on_add: 新增 todo 回調，接受可選的日期參數
             on_edit: 編輯 todo 回調
             on_delete: 刪除 todo 回調
             on_back: 返回月曆回調
@@ -69,8 +70,12 @@ class TodoListView:
         title_label = ttk.Label(header_frame, text=title_text, font=("Arial", 12, "bold"))
         title_label.pack(side=tk.LEFT, padx=20)
         
-        # 新增按鈕
-        add_btn = ttk.Button(header_frame, text="+ 新增任務", command=self.on_add)
+        # 新增按鈕（傳遞選中的日期）
+        add_btn = ttk.Button(
+            header_frame, 
+            text="+ 新增任務", 
+            command=lambda: self.on_add(self.selected_date) if self.selected_date else self.on_add()
+        )
         add_btn.pack(side=tk.RIGHT)
         
         # 建立列表框架（包含滾動條）

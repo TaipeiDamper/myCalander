@@ -1,10 +1,11 @@
 """
 Todo List 應用程式 - 主程式
-版本: v1.0.2
+版本: v1.0.3
 建立日期: 2024-01-XX
 更新: 
   - v1.0.1: 調整視窗大小以容納今日任務顯示
   - v1.0.2: 新增完成/未完成切換功能
+  - v1.0.3: 新增任務時使用選中的日期作為預設值
 """
 
 import tkinter as tk
@@ -96,9 +97,9 @@ class TodoApp:
         """處理日期點擊事件"""
         self.show_todo_list_view(date)
     
-    def _on_add_todo(self):
+    def _on_add_todo(self, default_date: str = None):
         """處理新增 todo 事件"""
-        editor = TodoEditor(self.root)
+        editor = TodoEditor(self.root, default_date=default_date)
         new_todo = editor.show()
         
         if new_todo:

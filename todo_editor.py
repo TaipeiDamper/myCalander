@@ -1,7 +1,8 @@
 """
 Todo List 應用程式 - Todo 編輯器
-版本: v1.0.0
+版本: v1.0.1
 建立日期: 2024-01-XX
+更新: 新增 default_date 參數，支援預設日期設定
 """
 
 import tkinter as tk
@@ -13,16 +14,18 @@ from models import Todo
 class TodoEditor:
     """Todo 編輯對話框"""
     
-    def __init__(self, parent, todo: Todo = None):
+    def __init__(self, parent, todo: Todo = None, default_date: str = None):
         """
         初始化編輯器
         
         Args:
             parent: 父視窗
             todo: 要編輯的 Todo 物件（如果為 None 則為新增模式）
+            default_date: 新增模式時的預設日期（格式: YYYY-MM-DD），如果為 None 則使用今天
         """
         self.parent = parent
         self.todo = todo
+        self.default_date = default_date
         self.result = None
         
         # 建立對話框
@@ -76,9 +79,12 @@ class TodoEditor:
         )
         self.date_entry = ttk.Entry(self.dialog, width=40)
         self.date_entry.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
-        # 預設為今天
+        # 預設日期：如果有 default_date 就用它，否則用今天
         if not self.todo:
-            self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+            if self.default_date:
+                self.date_entry.insert(0, self.default_date)
+            else:
+                self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
         
         # 時間
         ttk.Label(self.dialog, text="時間 (HH:MM):").grid(
