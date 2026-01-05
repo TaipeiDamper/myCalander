@@ -1,7 +1,8 @@
 """
 Todo List 應用程式 - 主程式
-版本: v1.0.0
+版本: v1.0.1
 建立日期: 2024-01-XX
+更新: 調整視窗大小以容納今日任務顯示
 """
 
 import tkinter as tk
@@ -25,7 +26,7 @@ class TodoApp:
         """
         self.root = root
         self.root.title("Todo List 月曆應用程式")
-        self.root.geometry("800x600")
+        self.root.geometry("900x700")
         
         # 載入資料
         self.todos = load_todos()
@@ -156,4 +157,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

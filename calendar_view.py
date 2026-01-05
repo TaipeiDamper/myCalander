@@ -1,8 +1,10 @@
 """
 Todo List 應用程式 - 月曆視圖
-版本: v1.0.1
+版本: v1.0.2
 建立日期: 2024-01-XX
-更新: 修正日期計算錯誤和版面對齊問題
+更新: 
+  - v1.0.1: 修正日期計算錯誤和版面對齊問題
+  - v1.0.2: 週日移到最左側、日期加英文簡寫、顏色區分、今日任務顯示
 """
 
 import tkinter as tk
@@ -54,18 +56,25 @@ class CalendarView:
         next_btn = ttk.Button(header_frame, text="▶", width=3, command=self._next_month)
         next_btn.pack(side=tk.LEFT, padx=5)
         
-        # 星期標題
+        # 星期標題（週日在最左側）
         weekdays_frame = ttk.Frame(self.frame)
         weekdays_frame.pack(pady=5)
         
-        weekdays = ["一", "二", "三", "四", "五", "六", "日"]
-        for day in weekdays:
-            label = ttk.Label(weekdays_frame, text=day, width=12, anchor="center")
+        # 週日移到最左側：["日", "一", "二", "三", "四", "五", "六"]
+        weekdays = ["日", "一", "二", "三", "四", "五", "六"]
+        weekday_abbr = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+        for i, day in enumerate(weekdays):
+            label_text = f"{day}\n{weekday_abbr[i]}"
+            label = ttk.Label(weekdays_frame, text=label_text, width=12, anchor="center", font=("Arial", 9))
             label.pack(side=tk.LEFT, padx=2)
         
         # 月曆網格
         self.calendar_frame = ttk.Frame(self.frame)
         self.calendar_frame.pack(pady=10)
+        
+        # 今日任務區域
+        self.today_tasks_frame = ttk.LabelFrame(self.frame, text="今日任務", padding=10)
+        self.today_tasks_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         self._update_calendar()
     
@@ -91,6 +100,14 @@ class CalendarView:
         self.month_label.config(text=self._get_month_year_str())
         self._update_calendar()
     
+    def _get_weekday_abbr(self, date_obj: datetime) -> str:
+        """取得星期英文簡寫"""
+        abbr_map = {
+            0: "MON", 1: "TUE", 2: "WED", 3: "THU", 
+            4: "FRI", 5: "SAT", 6: "SUN"
+        }
+        return abbr_map[date_obj.weekday()]
+    
     def _update_calendar(self):
         """更新月曆顯示"""
         # 清除舊的按鈕
@@ -99,10 +116,11 @@ class CalendarView:
         
         # 計算月份的第一天是星期幾
         # Python weekday(): Monday=0, Tuesday=1, ..., Sunday=6
-        # 我們的星期標題：["一", "二", "三", "四", "五", "六", "日"]
-        # 所以 Monday=0 對應 "一"=0, Sunday=6 對應 "日"=6
+        # 現在週日在最左側，所以：Sunday=6 -> 0, Monday=0 -> 1, ..., Saturday=5 -> 6
         first_day = self.current_date.replace(day=1)
-        weekday = first_day.weekday()  # 直接使用，Monday=0 對應第一列
+        weekday_python = first_day.weekday()  # Monday=0, Sunday=6
+        # 轉換為週日=0的格式：Sunday(6) -> 0, Monday(0) -> 1, ..., Saturday(5) -> 6
+        weekday = (weekday_python + 1) % 7
         
         # 計算月份有多少天
         if self.current_date.month == 12:
@@ -110,6 +128,10 @@ class CalendarView:
         else:
             next_month = self.current_date.replace(month=self.current_date.month + 1, day=1)
         days_in_month = (next_month - timedelta(days=1)).day
+        
+        # 取得今天的日期
+        today = datetime.now()
+        today_str = today.strftime("%Y-%m-%d")
         
         # 建立日期按鈕
         row = 0
@@ -123,45 +145,51 @@ class CalendarView:
         
         # 建立日期按鈕
         for day in range(1, days_in_month + 1):
-            date_str = first_day.replace(day=day).strftime("%Y-%m-%d")
+            date_obj = first_day.replace(day=day)
+            date_str = date_obj.strftime("%Y-%m-%d")
+            weekday_abbr = self._get_weekday_abbr(date_obj)
             
             # 檢查這一天是否有 todo
             day_todos = [t for t in self.todos if t.date == date_str and not t.completed]
             
-            # 建立按鈕
+            # 判斷是否為今天
+            is_today = (self.current_date.year == today.year and 
+                       self.current_date.month == today.month and 
+                       day == today.day)
+            
+            # 建立按鈕文字（日期 + 英文簡寫）
             if day_todos:
-                # 有 todo 的日期，顯示第一個 todo 的標題
-                btn_text = f"{day}\n{day_todos[0].title[:8]}"
+                # 有 todo 的日期
+                btn_text = f"{day}\n{weekday_abbr}\n{day_todos[0].title[:6]}"
                 if len(day_todos) > 1:
                     btn_text += f"\n(+{len(day_todos)-1})"
-                btn = tk.Button(
-                    self.calendar_frame,
-                    text=btn_text,
-                    width=12,
-                    height=3,
-                    command=lambda d=date_str: self.on_date_click(d),
-                    bg="#e3f2fd",
-                    relief=tk.RAISED,
-                    anchor="n"
-                )
             else:
                 # 沒有 todo 的日期
-                btn = tk.Button(
-                    self.calendar_frame,
-                    text=str(day),
-                    width=12,
-                    height=3,
-                    command=lambda d=date_str: self.on_date_click(d),
-                    relief=tk.RAISED,
-                    anchor="center"
-                )
+                btn_text = f"{day}\n{weekday_abbr}"
             
-            # 如果是今天，標記顏色
-            today = datetime.now()
-            if (self.current_date.year == today.year and 
-                self.current_date.month == today.month and 
-                day == today.day):
-                btn.config(bg="#fff9c4")
+            # 建立按鈕
+            btn = tk.Button(
+                self.calendar_frame,
+                text=btn_text,
+                width=12,
+                height=4,
+                command=lambda d=date_str: self.on_date_click(d),
+                relief=tk.RAISED,
+                anchor="n",
+                font=("Arial", 9)
+            )
+            
+            # 設定顏色
+            if is_today:
+                # 今天是特殊標註（邊框加粗 + 特殊顏色）
+                btn.config(bg="#ffeb3b", fg="#000000", 
+                          relief=tk.SOLID, borderwidth=3)
+            elif day_todos:
+                # 有任務的日期（淺藍色）
+                btn.config(bg="#e3f2fd", fg="#000000")
+            else:
+                # 沒有任務的日期（白色/灰色）
+                btn.config(bg="#f5f5f5", fg="#000000")
             
             btn.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
             
@@ -173,6 +201,60 @@ class CalendarView:
         # 設定欄位權重，讓按鈕均勻分佈
         for i in range(7):
             self.calendar_frame.columnconfigure(i, weight=1, uniform="calendar_col")
+        
+        # 更新今日任務顯示
+        self._update_today_tasks()
+    
+    def _update_today_tasks(self):
+        """更新今日任務顯示"""
+        # 清除舊的任務顯示
+        for widget in self.today_tasks_frame.winfo_children():
+            widget.destroy()
+        
+        # 取得今天的日期
+        today = datetime.now()
+        today_str = today.strftime("%Y-%m-%d")
+        
+        # 取得今日的任務
+        today_todos = [t for t in self.todos if t.date == today_str and not t.completed]
+        
+        if not today_todos:
+            # 沒有任務
+            no_task_label = ttk.Label(
+                self.today_tasks_frame, 
+                text="今天沒有待完成的任務",
+                foreground="gray"
+            )
+            no_task_label.pack(pady=10)
+        else:
+            # 排序任務（按時間）
+            today_todos = sorted(today_todos)
+            
+            # 建立任務列表框架（含滾動條）
+            list_frame = ttk.Frame(self.today_tasks_frame)
+            list_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 滾動條
+            scrollbar = ttk.Scrollbar(list_frame)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # 任務列表
+            task_listbox = tk.Listbox(
+                list_frame,
+                yscrollcommand=scrollbar.set,
+                font=("Arial", 10),
+                selectmode=tk.SINGLE
+            )
+            task_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.config(command=task_listbox.yview)
+            
+            # 加入任務到列表
+            for todo in today_todos:
+                time_str = todo.time if todo.time else "全天"
+                task_text = f"[{time_str}] {todo.title}"
+                if todo.content:
+                    task_text += f" - {todo.content[:30]}"
+                task_listbox.insert(tk.END, task_text)
     
     def update_todos(self, todos: List[Todo]):
         """更新 todo 列表並刷新月曆"""
