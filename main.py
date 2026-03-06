@@ -1,74 +1,111 @@
-"""
-Todo List 應用程式 - 主程式
-版本: v1.0.3
-建立日期: 2024-01-XX
-更新: 
-  - v1.0.1: 調整視窗大小以容納今日任務顯示
-  - v1.0.2: 新增完成/未完成切換功能
-  - v1.0.3: 新增任務時使用選中的日期作為預設值
-"""
-
 import tkinter as tk
 from tkinter import messagebox
-from models import Todo
-from data_manager import load_todos, save_todos
-from calendar_view import CalendarView
-from todo_list_view import TodoListView
-from todo_editor import TodoEditor
-
+import time
+from core.models import Todo
+from core.data_manager import load_todos, save_todos
+from todo.calendar_view import CalendarView
+from todo.todo_list_view import TodoListView
+from todo.todo_editor import TodoEditor
+from stock.stock_widget import HiddenStockWidget
+from weather.weather_widget import HiddenWeatherWidget
+from core.clock_widget import ClockPomodoroWidget
+from core.sidebar import AppSidebar
 
 class TodoApp:
     """Todo List 應用程式主類別"""
     
+class TodoApp:
+    """Todo List 應用程式主類別"""
+    
     def __init__(self, root):
-        """
-        初始化應用程式
-        
-        Args:
-            root: Tkinter 根視窗
-        """
         self.root = root
-        self.root.title("Todo List 月曆應用程式")
-        self.root.geometry("900x700")
+        self.root.title("Todo List 智能曆")
+        self.root.geometry("900x700") # 固定主視窗尺寸，不變形
         
         # 載入資料
         self.todos = load_todos()
         
-        # 當前視圖狀態
-        self.current_view = "calendar"  # "calendar" 或 "todo_list"
-        self.selected_date = None
+        # --- 佈局架構 ---
+        # 1. 頂部導航
+        self.header = tk.Frame(root)
+        self.header.pack(fill=tk.X, padx=10, pady=5)
         
-        # 建立主容器
+        # 2. 磁吸式側邊欄 (獨立懸浮擴展)
+        self.sidebar = AppSidebar(root)
+        
+        # --- 主體導航列元件 ---
+        # 天氣摘要 -> 點選切換側邊欄天氣
+        self.weather_header = HiddenWeatherWidget(self.header, mode="header")
+        self.weather_header.pack(side=tk.LEFT)
+        self.weather_header.collapsed_lbl.bind("<Button-1>", lambda e: self.sidebar.toggle_widget("詳細天氣"))
+        
+        # 時鐘摘要 -> 點選切換側邊欄番茄鐘
+        self.clock_lbl = tk.Label(self.header, text="00:00:00", font=("Courier", 14, "bold"), fg="#333333", cursor="hand2")
+        self.clock_lbl.pack(side=tk.RIGHT)
+        self.clock_lbl.bind("<Button-1>", lambda e: self.sidebar.toggle_widget("番茄鐘控制"))
+        
+        def update_header_clock():
+            self.clock_lbl.config(text=time.strftime("%H:%M:%S"))
+            self.root.after(1000, update_header_clock)
+        update_header_clock()
+
+        self.nav_frame = tk.Frame(self.header)
+        self.nav_frame.pack(expand=True)
+        
+        # --- 中央主容器 ---
         self.main_container = tk.Frame(root)
         self.main_container.pack(fill=tk.BOTH, expand=True)
         
+        # 側邊欄功能註冊
+        self.weather_sidebar = self.sidebar.register_widget("詳細天氣", lambda p: HiddenWeatherWidget(p, mode="sidebar"))
+        self.pomo_widget = self.sidebar.register_widget("番茄鐘控制", lambda p: ClockPomodoroWidget(p, on_activate=lambda: self.sidebar.show_only("番茄鐘控制")))
+
         # 初始化視圖
-        self.calendar_view = None
-        self.todo_list_view = None
-        
-        # 顯示月曆視圖
-        self.show_calendar_view()
-    
-    def show_calendar_view(self):
-        """顯示月曆視圖"""
-        # 清除當前視圖
-        self._clear_view()
-        
-        # 建立月曆視圖
         self.calendar_view = CalendarView(
             self.main_container,
             self.todos,
-            on_date_click=self._on_date_click
+            on_date_click=self._on_date_click,
+            external_nav_frame=self.nav_frame
         )
         self.calendar_view.get_frame().pack(fill=tk.BOTH, expand=True)
         
         self.current_view = "calendar"
         self.selected_date = None
+        
+        self.stock_widget = HiddenStockWidget(self.root)
+        self.stock_widget.place(relx=0.99, rely=0.99, anchor="se")
+        self.stock_widget.lift()
+    
+    def show_calendar_view(self):
+        """顯示月曆視圖"""
+        # 如果不是從列表切回月曆，一般是由此管理
+        if self.current_view != "calendar":
+            self._clear_view()
+            self.calendar_view = CalendarView(
+                self.main_container,
+                self.todos,
+                on_date_click=self._on_date_click,
+                external_nav_frame=self.nav_frame
+            )
+            self.calendar_view.get_frame().pack(fill=tk.BOTH, expand=True)
+            self.current_view = "calendar"
+            self.selected_date = None
+            
+            # 回到月曆頁面時，顯示股票小工具
+            self.stock_widget.place(relx=0.99, rely=0.99, anchor="se")
+            self.stock_widget.lift()
     
     def show_todo_list_view(self, date: str = None):
         """顯示 Todo 列表視圖"""
-        # 清除當前視圖
+        # 清除當前主視圖
         self._clear_view()
+        
+        # 清除頂部中央的月曆導航內容 (因為現在是列表模式)
+        for widget in self.nav_frame.winfo_children():
+            widget.destroy()
+            
+        # 進入任務選單時，隱藏右下角的股票小工具
+        self.stock_widget.place_forget()
         
         # 建立 Todo 列表視圖
         self.todo_list_view = TodoListView(

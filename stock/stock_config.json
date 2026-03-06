@@ -1,0 +1,25 @@
+{
+    "update_interval_seconds": 60,
+    "stocks": [
+        {
+            "symbol": "tse_0050",
+            "reference": 45.46
+        },
+        {
+            "symbol": "otc_00679B",
+            "reference": 26.56
+        },
+        {
+            "symbol": "otc_00687B",
+            "reference": 27.53
+        },
+        {
+            "symbol": "tse_2603",
+            "reference": 188.0
+        },
+        {
+            "symbol": "tse_2609",
+            "reference": 60.0
+        }
+    ]
+}

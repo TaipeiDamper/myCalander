@@ -1,0 +1,8 @@
+{
+    "update_interval_minutes": 60,
+    "location": {
+        "name": "Songshan",
+        "latitude": 25.056,
+        "longitude": 121.565
+    }
+}

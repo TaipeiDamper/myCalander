@@ -1,36 +1,53 @@
-"""
-打包腳本 - 使用 PyInstaller 將應用程式打包成 exe
-版本: v1.0.0
-"""
-
-import PyInstaller.__main__
 import os
+import subprocess
 import sys
 
-def build_exe():
-    """打包應用程式為 exe"""
+def build():
+    # 檢查是否安裝了 pyinstaller
+    try:
+        import PyInstaller
+    except ImportError:
+        print("未偵測到 PyInstaller，正在進行安裝...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+
+    print("開始打包 智能曆 應用程式...")
     
-    # PyInstaller 參數
-    args = [
-        'main.py',                    # 主程式檔案
-        '--name=TodoListCalendar',    # 執行檔名稱
-        '--onefile',                  # 打包成單一執行檔
-        '--windowed',                 # 不顯示控制台視窗（GUI 應用）
-        '--icon=NONE',                # 如果有圖示檔案可以指定路徑
-        '--add-data=todos.json;.',    # 包含資料檔案（如果存在）
-        '--hidden-import=tkinter',     # 確保 tkinter 被包含
-        '--hidden-import=tkinter.ttk',
-        '--clean',                     # 清理暫存檔案
+    # 打包指令
+    # --noconsole: 不顯示黑視窗
+    # --onefile: 打包成單一 exe (雖然啟動稍慢，但方便攜帶)
+    # --name: 輸出的檔名
+    # --clean: 清除暫存目錄
+    cmd = [
+        "pyinstaller",
+        "--noconsole",
+        "--onefile",
+        "--name", "SmartCalendar",
+        "--clean",
+        "main.py"
     ]
     
-    # 如果 todos.json 不存在，移除該參數
-    if not os.path.exists('todos.json'):
-        args = [arg for arg in args if not arg.startswith('--add-data=todos.json')]
-    
-    PyInstaller.__main__.run(args)
-    
-    print("\n打包完成！執行檔位於 dist/TodoListCalendar.exe")
+    try:
+        subprocess.check_call(cmd)
+        
+        # 自動複製設定檔到 dist 資料夾
+        import shutil
+        configs = [
+            "todos.json", 
+            os.path.join("stock", "stock_config.json"), 
+            os.path.join("weather", "weather_config.json")
+        ]
+        for cfg in configs:
+            if os.path.exists(cfg):
+                dest_name = os.path.basename(cfg)
+                shutil.copy(cfg, os.path.join("dist", dest_name))
+                print(f"已複製: {cfg} -> dist/{dest_name}")
+
+        print("\n" + "="*50)
+        print("打包完成！")
+        print("您的執行檔 (.exe) 位在: dist/SmartCalendar.exe")
+        print("="*50)
+    except subprocess.CalledProcessError as e:
+        print(f"打包失敗: {e}")
 
 if __name__ == "__main__":
-    build_exe()
-
+    build()

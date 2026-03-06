@@ -7,10 +7,16 @@ Todo List 應用程式 - 資料管理
 import json
 import os
 from typing import List
-from models import Todo
+from core.models import Todo
 
 
-DATA_FILE = "todos.json"
+import sys
+def get_data_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+DATA_FILE = os.path.join(get_data_path(), "todos.json")
 
 
 def load_todos() -> List[Todo]:
