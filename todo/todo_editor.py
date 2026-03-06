@@ -35,7 +35,7 @@ class TodoEditor:
         self.dialog.grab_set()
         
         # 設定對話框大小和位置
-        self.dialog.geometry("400x300")
+        self.dialog.geometry("400x520")
         self.dialog.resizable(False, False)
         
         # 居中顯示
@@ -96,9 +96,30 @@ class TodoEditor:
         if not self.todo:
             self.time_entry.insert(0, datetime.now().strftime("%H:%M"))
         
+        # 重要性
+        ttk.Label(self.dialog, text="重要性 (1-10):").grid(
+            row=4, column=0, padx=10, pady=10, sticky="w"
+        )
+        self.importance_scale = tk.Scale(self.dialog, from_=1, to=10, orient=tk.HORIZONTAL)
+        self.importance_scale.set(5)
+        self.importance_scale.grid(row=4, column=1, padx=10, pady=5, sticky="ew")
+
+        # 時間相關性
+        ttk.Label(self.dialog, text="時間相關性 (0-10):").grid(
+            row=5, column=0, padx=10, pady=10, sticky="w"
+        )
+        self.time_sensitivity_scale = tk.Scale(self.dialog, from_=0, to=10, orient=tk.HORIZONTAL)
+        self.time_sensitivity_scale.set(5)
+        self.time_sensitivity_scale.grid(row=5, column=1, padx=10, pady=5, sticky="ew")
+        
+        # 完成狀態
+        self.completed_var = tk.BooleanVar()
+        self.completed_check = ttk.Checkbutton(self.dialog, text="已完成", variable=self.completed_var)
+        self.completed_check.grid(row=6, column=1, padx=10, pady=10, sticky="w")
+
         # 按鈕框架
         button_frame = ttk.Frame(self.dialog)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=7, column=0, columnspan=2, pady=20)
         
         ttk.Button(button_frame, text="確定", command=self._on_ok).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=self._on_cancel).pack(side=tk.LEFT, padx=5)
@@ -114,6 +135,11 @@ class TodoEditor:
             self.content_text.insert("1.0", self.todo.content)
             self.date_entry.insert(0, self.todo.date)
             self.time_entry.insert(0, self.todo.time)
+            if hasattr(self.todo, 'importance'):
+                self.importance_scale.set(self.todo.importance)
+            if hasattr(self.todo, 'time_sensitivity'):
+                self.time_sensitivity_scale.set(self.todo.time_sensitivity)
+            self.completed_var.set(self.todo.completed)
     
     def _validate_input(self) -> bool:
         """驗證輸入"""
@@ -150,6 +176,9 @@ class TodoEditor:
         content = self.content_text.get("1.0", tk.END).strip()
         date = self.date_entry.get().strip()
         time = self.time_entry.get().strip()
+        importance_val = int(self.importance_scale.get())
+        time_sens_val = int(self.time_sensitivity_scale.get())
+        completed_val = self.completed_var.get()
         
         if self.todo:
             # 編輯模式：更新現有 todo
@@ -157,6 +186,9 @@ class TodoEditor:
             self.todo.content = content
             self.todo.date = date
             self.todo.time = time
+            self.todo.importance = importance_val
+            self.todo.time_sensitivity = time_sens_val
+            self.todo.completed = completed_val
             self.result = self.todo
         else:
             # 新增模式：建立新 todo
@@ -164,7 +196,10 @@ class TodoEditor:
                 title=title,
                 content=content,
                 date=date,
-                time=time
+                time=time,
+                importance=importance_val,
+                time_sensitivity=time_sens_val,
+                completed=completed_val
             )
         
         self.dialog.destroy()

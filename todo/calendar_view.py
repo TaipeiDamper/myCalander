@@ -102,7 +102,7 @@ class CalendarView:
         
         # 今日任務區域
         self.today_tasks_frame = ttk.LabelFrame(self.paned_window, text="今日任務", padding=10)
-        self.paned_window.add(self.today_tasks_frame, minsize=150) # 加入 PanedWindow，位於下半部
+        self.paned_window.add(self.today_tasks_frame, minsize=180) # 加大最小高度以防標題欄位被擠壓到看不到
         
         self.holidays_cache = {}
         self._fetch_holidays(self.current_date.year)
@@ -410,8 +410,8 @@ class CalendarView:
                 task_listbox2.insert(tk.END, task_text)
         
         # 設定主容器的行權重
-        main_container.rowconfigure(0, weight=1)
-        main_container.rowconfigure(1, weight=1)
+        main_container.rowconfigure(0, weight=1, minsize=60)
+        main_container.rowconfigure(1, weight=1, minsize=60)
         main_container.columnconfigure(0, weight=1)
     
     def update_todos(self, todos: List[Todo]):

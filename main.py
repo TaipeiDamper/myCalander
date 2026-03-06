@@ -1,10 +1,12 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import time
+from datetime import datetime
 from core.models import Todo
 from core.data_manager import load_todos, save_todos
 from todo.calendar_view import CalendarView
 from todo.todo_list_view import TodoListView
+from todo.matrix_view import MatrixView
 from todo.todo_editor import TodoEditor
 from stock.stock_widget import HiddenStockWidget
 from weather.weather_widget import HiddenWeatherWidget
@@ -49,6 +51,17 @@ class TodoApp:
             self.root.after(1000, update_header_clock)
         update_header_clock()
 
+        # 獨立的視圖切換按鈕區塊 (放在 header 右側，不被 calendar_view 刪除)
+        self.switch_frame = tk.Frame(self.header)
+        self.switch_frame.pack(side=tk.RIGHT, padx=10)
+        
+        self.view_switch_btn = ttk.Button(self.switch_frame, text="切換至任務清單(矩陣)", command=self.toggle_main_view)
+        self.view_switch_btn.pack(side=tk.RIGHT)
+        
+        self.matrix_add_btn = ttk.Button(self.switch_frame, text="新增任務", command=self._on_add_todo)
+        # matrix_add_btn 先不 pack，進入矩陣視圖時才顯示
+        
+        # 中央主體導航列元件 (提供給月曆用)
         self.nav_frame = tk.Frame(self.header)
         self.nav_frame.pack(expand=True)
         
@@ -90,10 +103,44 @@ class TodoApp:
             self.calendar_view.get_frame().pack(fill=tk.BOTH, expand=True)
             self.current_view = "calendar"
             self.selected_date = None
+            self.view_switch_btn.config(text="切換至任務清單(矩陣)")
+            self.matrix_add_btn.pack_forget()
             
             # 回到月曆頁面時，顯示股票小工具
             self.stock_widget.place(relx=0.99, rely=0.99, anchor="se")
             self.stock_widget.lift()
+            
+    def show_matrix_view(self):
+        """顯示艾森豪矩陣視圖"""
+        if self.current_view != "matrix":
+            self._clear_view()
+            # 清除頂部中央的月曆導航內容
+            for widget in self.nav_frame.winfo_children():
+                widget.destroy()
+                
+            self.view_switch_btn.config(text="返回月曆視圖")
+            # 顯示新增按鈕
+            self.matrix_add_btn.pack(side=tk.LEFT, padx=5)
+            
+            self.stock_widget.place_forget()
+            
+            self.matrix_view = MatrixView(
+                self.main_container,
+                self.todos,
+                on_edit=self._on_edit_todo,
+                on_toggle_complete=self._on_toggle_complete
+            )
+            self.matrix_view.get_frame().pack(fill=tk.BOTH, expand=True)
+            self.current_view = "matrix"
+            self.selected_date = None
+            
+    def toggle_main_view(self):
+        """切換 主畫面 (月曆 <-> 矩陣)"""
+        # 放棄按鈕文字切換，改成明確的路由功能
+        if self.current_view in ("calendar", "todo_list"):
+            self.show_matrix_view()
+        else:
+            self.show_calendar_view()
     
     def show_todo_list_view(self, date: str = None):
         """顯示 Todo 列表視圖"""
@@ -103,6 +150,9 @@ class TodoApp:
         # 清除頂部中央的月曆導航內容 (因為現在是列表模式)
         for widget in self.nav_frame.winfo_children():
             widget.destroy()
+            
+        self.view_switch_btn.config(text="切換至任務清單(矩陣)")
+        self.matrix_add_btn.pack_forget()
             
         # 進入任務選單時，隱藏右下角的股票小工具
         self.stock_widget.place_forget()
@@ -129,6 +179,7 @@ class TodoApp:
             widget.destroy()
         self.calendar_view = None
         self.todo_list_view = None
+        self.matrix_view = None
     
     def _on_date_click(self, date: str):
         """處理日期點擊事件"""
@@ -140,6 +191,8 @@ class TodoApp:
         new_todo = editor.show()
         
         if new_todo:
+            if new_todo.completed:
+                new_todo.completion_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.todos.append(new_todo)
             self._save_and_refresh()
     
@@ -149,6 +202,10 @@ class TodoApp:
         edited_todo = editor.show()
         
         if edited_todo:
+            if edited_todo.completed and not edited_todo.completion_time:
+                edited_todo.completion_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            elif not edited_todo.completed:
+                edited_todo.completion_time = None
             # todo 物件已經被編輯器直接修改，只需要刷新
             self._save_and_refresh()
     
@@ -166,6 +223,10 @@ class TodoApp:
     
     def _on_toggle_complete(self, todo: Todo):
         """處理切換完成狀態事件"""
+        if todo.completed:
+            todo.completion_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            todo.completion_time = None
         self._save_and_refresh()
     
     def _save_and_refresh(self):
@@ -180,6 +241,9 @@ class TodoApp:
         elif self.current_view == "todo_list":
             if self.todo_list_view:
                 self.todo_list_view.update_todos(self.todos, self.selected_date)
+        elif self.current_view == "matrix":
+            if self.matrix_view:
+                self.matrix_view.update_todos(self.todos)
     
     def on_closing(self):
         """處理視窗關閉事件"""

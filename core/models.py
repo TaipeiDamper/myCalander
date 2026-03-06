@@ -12,7 +12,8 @@ class Todo:
     """Todo 任務類別"""
     
     def __init__(self, title: str, content: str = "", date: str = "", 
-                 time: str = "", completed: bool = False, todo_id: Optional[str] = None):
+                 time: str = "", completed: bool = False, todo_id: Optional[str] = None,
+                 importance: int = 5, time_sensitivity: int = 5):
         """
         初始化 Todo 任務
         
@@ -30,7 +31,10 @@ class Todo:
         self.date = date
         self.time = time
         self.completed = completed
+        self.importance = importance
+        self.time_sensitivity = time_sensitivity
         self.order = 0  # 用於拖曳排序
+        self.completion_time = None  # 用於記錄何時完成
     
     @staticmethod
     def _generate_id() -> str:
@@ -46,7 +50,10 @@ class Todo:
             "date": self.date,
             "time": self.time,
             "completed": self.completed,
-            "order": self.order
+            "importance": getattr(self, "importance", 5),
+            "time_sensitivity": getattr(self, "time_sensitivity", 5),
+            "order": self.order,
+            "completion_time": self.completion_time
         }
     
     @classmethod
@@ -58,9 +65,12 @@ class Todo:
             date=data.get("date", ""),
             time=data.get("time", ""),
             completed=data.get("completed", False),
-            todo_id=data.get("id")
+            todo_id=data.get("id"),
+            importance=data.get("importance", 5),
+            time_sensitivity=data.get("time_sensitivity", 5)
         )
         todo.order = data.get("order", 0)
+        todo.completion_time = data.get("completion_time")
         return todo
     
     def get_datetime(self) -> Optional[datetime]:
