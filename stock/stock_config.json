@@ -1,25 +1,38 @@
 {
     "update_interval_seconds": 60,
+    "alert_threshold_short": 5.0,
+    "alert_threshold_long": 15.0,
+    "color_intensity": 1.0,
     "stocks": [
         {
             "symbol": "tse_0050",
-            "reference": 45.46
+            "reference": 45.46,
+            "alert_short": 5.0,
+            "alert_long": 75.98
         },
         {
             "symbol": "otc_00679B",
-            "reference": 26.56
+            "reference": 26.56,
+            "alert_short": 5.0,
+            "alert_long": 15.0
         },
         {
             "symbol": "otc_00687B",
-            "reference": 27.53
+            "reference": 27.53,
+            "alert_short": 5.0,
+            "alert_long": 15.0
         },
         {
             "symbol": "tse_2603",
-            "reference": 188.0
+            "reference": 190.13,
+            "alert_short": 5.0,
+            "alert_long": 15.0
         },
         {
             "symbol": "tse_2609",
-            "reference": 60.0
+            "reference": 60.0,
+            "alert_short": 5.0,
+            "alert_long": 15.0
         }
     ]
 }

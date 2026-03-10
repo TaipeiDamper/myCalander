@@ -44,7 +44,8 @@ class AppSidebar(tk.Toplevel):
 
         # 4. 狀態管理
         self.widget_configs = {} 
-        self.ordered_names = ["番茄鐘控制", "詳細天氣", "系統設定"]
+        self.ordered_names = ["番茄鐘控制", "詳細天氣", "投資通知", "系統設定"]
+
         self.active_count = 0
 
         # === 同步邏輯 (關鍵修正) ===

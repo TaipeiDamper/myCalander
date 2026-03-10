@@ -1,284 +1,398 @@
 import tkinter as tk
-import urllib.request
-import json
-import threading
+from tkinter import messagebox
 import os
+from .data_manager import StockDataManager
 
 CONFIG_FILE = "stock_config.json"
 
+class StockStyle:
+    """集中管理 UI 配色與樣式"""
+    PRIMARY_GREY = "#d0d0d0"
+    HOVER_GREY = "#888888"
+    BAR_TRACK = "#f2f2f2"
+    BAR_GUIDE = "#e5e5e5"
+    TEXT_POPUP = "#444444"
+    FONT_MAIN = ("Arial", 9)
+    FONT_SMALL = ("Arial", 7)
+    FONT_BOLD = ("Arial", 8, "bold")
+
 class HiddenStockWidget(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, on_notify_toggle=None, on_alert=None):
         super().__init__(parent, cursor="hand2")
-        self.parent = parent
-        
+        self.on_notify_toggle = on_notify_toggle
+        self.on_alert = on_alert
+
         self.labels = {}
         self._update_job = None
         self.is_collapsed = False
+        self.active_dialog = None  # 紀錄當前開啟的對話視窗
+        self.active_trigger = None # 紀錄是誰觸發的 (代號或⚙️)
+
         
-        self.config_data = self._load_config()
-        # 更新間隔改為「秒」，預設為 30 秒
-        self.update_interval_ms = self.config_data.get("update_interval_seconds", 30) * 1000
+        # 初始化數據管理器
+        self.data_manager = StockDataManager(self._get_config_path())
+        self.update_interval_ms = self.data_manager.config_data.get("update_interval_seconds", 30) * 1000
         
         self._build_ui()
-        self.update_prices()
+        self.refresh_prices()
         
-    def _load_config(self):
+    def _get_config_path(self):
         import sys
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-            
-        try:
-            config_path = os.path.join(base_path, CONFIG_FILE)
-            with open(config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {
-                "update_interval_seconds": 60,
-                "stocks": [
-                    {"symbol": "tse_0050", "reference": 190.0},
-                    {"symbol": "tse_2330", "reference": 800.0}
-                ]
-            }
+        base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, CONFIG_FILE)
 
     def toggle_collapse(self, event=None):
         self.is_collapsed = not self.is_collapsed
         self._build_ui()
         if not self.is_collapsed:
-            self.update_prices()
+            self.refresh_prices()
 
     def _build_ui(self):
-        for widget in self.winfo_children():
-            widget.destroy()
-            
+        for w in self.winfo_children(): w.destroy()
         self.labels.clear()
         
         bg_col = self.master.cget("bg")
         self.config(bg=bg_col)
         
         if self.is_collapsed:
-            expand_lbl = tk.Label(self, text="·", font=("Arial", 10, "bold"), fg="#b0b0b0", bg=bg_col, cursor="hand2")
-            expand_lbl.grid(row=0, column=0, padx=5, pady=2, sticky="e")
-            expand_lbl.bind("<Button-1>", self.toggle_collapse)
-            return
-
-        stocks = self.config_data.get("stocks", [])
-        
-        for i, stock in enumerate(stocks):
-            row_idx = i
-            symbol = stock.get("symbol", "")
-            reference = stock.get("reference", "-")
-            # 顯示時只保留數字代號 (e.g., tse_0050 -> 0050)
-            display_sym = symbol.split('_')[-1]
-            
-            sym_lbl = tk.Label(self, text=display_sym, font=("Arial", 9), fg="#b0b0b0", bg=bg_col)
-            sym_lbl.grid(row=row_idx, column=0, padx=2, pady=2, sticky="e")
-            
-            ref_lbl = tk.Label(self, text=str(reference), font=("Arial", 9), fg="#b0b0b0", bg=bg_col)
-            ref_lbl.grid(row=row_idx, column=1, padx=4, sticky="e")
-            
-            prev_lbl = tk.Label(self, text="-", font=("Arial", 9), fg="#b0b0b0", bg=bg_col)
-            prev_lbl.grid(row=row_idx, column=2, padx=4, sticky="e")
-            
-            curr_lbl = tk.Label(self, text="-", font=("Arial", 9), fg="#b0b0b0", bg=bg_col)
-            curr_lbl.grid(row=row_idx, column=3, padx=4, sticky="e")
-            
-            bar_canvas = tk.Canvas(self, width=60, height=20, bg=bg_col, highlightthickness=0)
-            bar_canvas.grid(row=row_idx, column=4, padx=5, sticky="w")
-            
-            hl_text_lbl = tk.Label(self, text="", font=("Arial", 7), fg="#b0b0b0", bg=bg_col, justify="left")
-            hl_text_lbl.grid(row=row_idx, column=5, padx=2, sticky="w")
-            
-            self.labels[symbol] = (prev_lbl, curr_lbl, bar_canvas, hl_text_lbl)
-            
-            for w in (sym_lbl, ref_lbl, prev_lbl, curr_lbl, bar_canvas, hl_text_lbl):
-                w.bind("<Button-1>", self.manual_update)
-
-        btn_row = len(stocks)
-        
-        collapse_lbl = tk.Label(self, text="×", font=("Arial", 9), fg="#b0b0b0", bg=bg_col, cursor="hand2")
-        collapse_lbl.grid(row=btn_row, column=4, padx=5, pady=2, sticky="e")
-        collapse_lbl.bind("<Button-1>", self.toggle_collapse)
-        
-        refresh_lbl = tk.Label(self, text="↻", font=("Arial", 9), fg="#b0b0b0", bg=bg_col, cursor="hand2")
-        refresh_lbl.grid(row=btn_row, column=5, padx=5, pady=2, sticky="w")
-        refresh_lbl.bind("<Button-1>", self.manual_update)
+            self._build_collapsed_ui(bg_col)
+        else:
+            self._build_expanded_ui(bg_col)
         
         self.bind("<Button-1>", self.manual_update)
 
+    def _build_collapsed_ui(self, bg):
+        lbl = tk.Label(self, text="·", font=("Arial", 10, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
+        lbl.grid(row=0, column=0, padx=5, pady=2, sticky="e")
+        lbl.bind("<Button-1>", self.toggle_collapse)
+
+    def _build_expanded_ui(self, bg):
+        stocks = self.data_manager.config_data.get("stocks", [])
+        for i, stock in enumerate(stocks):
+            symbol = stock.get("symbol", "")
+            ref = stock.get("reference", "-")
+            display_sym = symbol.split('_')[-1]
+            
+            # 標記
+            sym_lbl = tk.Label(self, text=display_sym, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
+            sym_lbl.grid(row=i, column=0, padx=2, pady=2, sticky="e")
+            sym_lbl.bind("<Button-1>", lambda e, s=symbol, r=ref, cfg=stock: self._show_edit_dialog(e, s, r, cfg))
+            self._add_hover(sym_lbl)
+            
+            ref_lbl = tk.Label(self, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
+            ref_lbl.grid(row=i, column=1, padx=4, sticky="e")
+
+
+            
+            prev_lbl = tk.Label(self, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
+            prev_lbl.grid(row=i, column=2, padx=4, sticky="e")
+            
+            curr_lbl = tk.Label(self, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
+            curr_lbl.grid(row=i, column=3, padx=4, sticky="e")
+            
+            canvas = tk.Canvas(self, width=75, height=20, bg=bg, highlightthickness=0, cursor="hand2")
+            canvas.grid(row=i, column=4, padx=5, sticky="w")
+            canvas.bind("<Button-1>", lambda e, c=canvas: self._on_bar_click(e, c))
+            
+            diff_lbl = tk.Label(self, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, justify="left")
+            diff_lbl.grid(row=i, column=5, padx=2, sticky="w")
+            
+            self.labels[symbol] = (prev_lbl, curr_lbl, canvas, diff_lbl)
+            
+            # 全部綁定手動更新（除了一些特殊按鈕）
+            for w in (curr_lbl, prev_lbl, diff_lbl): w.bind("<Button-1>", self.manual_update)
+
+        # 底部控制鈕
+        btn_row = len(stocks)
+        self._build_control_btns(btn_row, bg)
+
+    def _build_control_btns(self, row, bg):
+        items = [
+            ("⚙️", 1, "w", self._show_global_config_dialog),
+            ("×", 4, "e", self.toggle_collapse),
+            ("↻", 5, "w", self.manual_update)
+        ]
+
+        if self.on_notify_toggle:
+            items.append(("🔔", 3, "e", lambda: self.on_notify_toggle()))
+
+        for text, col, stick, cmd in items:
+            btn = tk.Label(self, text=text, font=("Arial", 10), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
+            btn.grid(row=row, column=col, padx=5, pady=2, sticky=stick)
+            btn.bind("<Button-1>", lambda e, c=cmd: c())
+            self._add_hover(btn)
+
+    def _add_hover(self, widget):
+        widget.bind("<Enter>", lambda e: widget.config(fg=StockStyle.HOVER_GREY))
+        widget.bind("<Leave>", lambda e: widget.config(fg=StockStyle.PRIMARY_GREY))
+
     def manual_update(self, event=None):
-        new_config = self._load_config()
-        if new_config != self.config_data:
-            self.config_data = new_config
-            self.update_interval_ms = self.config_data.get("update_interval_seconds", 30) * 1000
+        # 檢查設定是否有變動
+        old_config = self.data_manager.config_data.copy()
+        self.data_manager.config_data = self.data_manager.load_config()
+        if self.data_manager.config_data != old_config:
             self._build_ui()
             
-        for prev_lbl, curr_lbl, bar_canvas, hl_text_lbl in self.labels.values():
-            if curr_lbl.winfo_exists():
-                curr_lbl.config(text="...")
-                bar_canvas.delete("all")
-            
-        self.update_prices()
+        for _, curr, canvas, _ in self.labels.values():
+            if curr.winfo_exists():
+                curr.config(text="...")
+                canvas.delete("all")
+        self.refresh_prices()
+
+    def refresh_prices(self):
+        if self._update_job: self.after_cancel(self._update_job)
+        # 每次刷新前重新讀取設定，確保手動修改 JSON 也能即時反應
+        self.data_manager.config_data = self.data_manager.load_config()
+        self.data_manager.fetch_prices(self._on_fetch_done)
+
+    def _on_fetch_done(self, result):
+        # 切換到主執行緒執行 UI 更新
+        self.after(0, lambda: self._do_apply_updates(result))
+
+    def _do_apply_updates(self, result):
+        if self.is_collapsed or not result: return
         
-    def update_prices(self):
-        if self._update_job is not None:
-            self.after_cancel(self._update_job)
-            self._update_job = None
-            
-        threading.Thread(target=self._fetch_data, daemon=True).start()
+        updates = result.get("updates", {})
+        alerts = result.get("alerts", [])
         
-    def _fetch_data(self):
-        updates = {}
-        stocks = self.config_data.get("stocks", [])
-        if not stocks: return
-        import time
+        for sym, (prev, curr, high, low, hint) in updates.items():
 
-        # 直接使用 config 裡的代碼 (tse_0050 等)
-        query_parts = []
-        symbol_map = {} 
-        for stock in stocks:
-            s_key = stock.get("symbol", "")
-            if not s_key: continue
+            if sym not in self.labels: continue
+            lbl_prev, lbl_curr, canvas, lbl_diff = self.labels[sym]
+            if not lbl_curr.winfo_exists(): continue
+
+            # 更新文字
+            lbl_prev.config(text=f"{prev:.2f}")
+            lbl_curr.config(text=f"{curr:.{hint}f}")
+            diff_pct = (curr - prev) / prev * 100 if prev > 0 else 0
+            lbl_diff.config(text=f"{diff_pct:+.2f}%")
+
+            # 繪製圖形
+            self._draw_status_bar(canvas, prev, curr, high, low)
             
-            # 向 TWSE API 請求時需加上 .tw (tse_0050.tw)
-            twse_code = f"{s_key}.tw"
-            query_parts.append(twse_code)
+        # 處理警報 (即使 alerts 為空也要傳送，用來清除 UI 警示圖示)
+        if self.on_alert is not None:
+            self.on_alert(alerts)
+
             
-            # 建立代碼與 key 的映射 (0050 -> tse_0050)
-            code_only = s_key.split('_')[-1]
-            symbol_map[code_only] = s_key
+        # 循環更新
 
-        if not query_parts: return
+        self._update_job = self.after(self.update_interval_ms, self.refresh_prices)
 
+    def _draw_status_bar(self, canvas, prev, curr, high, low):
+        canvas.delete("all")
+        w, h = int(canvas.cget("width")), int(canvas.cget("height"))
+        
+        # 置中計算
+        v_low, v_high = min(low, prev), max(high, prev)
+        v_range = v_high - v_low
+        v_range_pct = (v_range / prev * 100.0) if prev > 0 else 0
+        
+        scale = min(1.0, (v_range_pct / 10.0) ** 0.7) if v_range_pct > 0 else 0.05
+        uw = (w - 12) * scale
+        if uw < 10: uw = 10
+        start_x = (w - uw) / 2
+        
+        def get_x(v):
+            return start_x + (v - v_low) / (v_high - v_low) * uw if v_high > v_low else w/2
+
+        xl, xh, xp, xc = get_x(low), get_x(high), get_x(prev), get_x(curr)
+        canvas.stock_coords = {'low': low, 'high': high, 'x_low': xl, 'x_high': xh}
+
+        # 軌道
+        canvas.create_line(xl, h/2, xh, h/2, fill=StockStyle.BAR_TRACK, width=4, capstyle=tk.ROUND)
+        # 端點
+        for x in (xl, xh): canvas.create_oval(x-2, h/2-2, x+2, h/2+2, fill="#eeeeee", outline="")
+        # 昨收線
+        canvas.create_line(xp, 3, xp, h-3, fill=StockStyle.BAR_GUIDE, width=2)
+        
+        # 三角形指示
+        if curr != prev:
+            points = [xc+5, h/2, xc-4, h/2-5, xc-4, h/2+5] if curr > prev else [xc-5, h/2, xc+4, h/2-5, xc+4, h/2+5]
+            canvas.create_polygon(points, fill="", outline=StockStyle.PRIMARY_GREY, width=1)
+        else:
+            canvas.create_oval(xc-4, h/2-4, xc+4, h/2+4, fill="", outline=StockStyle.PRIMARY_GREY, width=1)
+
+    def _on_bar_click(self, event, canvas):
+        if hasattr(canvas, "stock_coords"):
+            coords = canvas.stock_coords
+            if event.x < canvas.winfo_width() / 2:
+                self._show_temp_val(canvas, f"L:{coords['low']:.2f}", coords['x_low'])
+            else:
+                self._show_temp_val(canvas, f"H:{coords['high']:.2f}", coords['x_high'])
+            return
+        self.manual_update()
+
+    def _show_temp_val(self, canvas, text, x):
+        canvas.delete("temp_val")
+        canvas.create_text(x, 6, text=text, fill=StockStyle.TEXT_POPUP, font=StockStyle.FONT_BOLD, tags="temp_val")
+        self.after(3000, lambda: canvas.delete("temp_val"))
+
+    def _show_edit_dialog(self, event, symbol, current_ref, stock_cfg):
+        # 實現 Toggle 邏輯：按第二次就收回
+        if self.active_dialog and self.active_dialog.winfo_exists():
+            is_same = (self.active_trigger == symbol)
+            self.active_dialog.destroy()
+            self.active_dialog = None
+            self.active_trigger = None
+            if is_same: return
+
+        dialog = tk.Toplevel(self)
+        self.active_dialog = dialog
+        self.active_trigger = symbol
+        
+        dialog.title(f"標的設定: {symbol.split('_')[-1]}")
+        
+        # 置中於螢幕
+        w, h = 260, 220
+        sw = dialog.winfo_screenwidth()
+        sh = dialog.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 2
+        dialog.geometry(f"{w}x{h}+{x}+{y}")
+        dialog.resizable(0, 0)
+
+        dialog.attributes("-topmost", True)
+        
+        # 標題與基準價
+        tk.Label(dialog, text=f"【{symbol.split('_')[-1]}】 參數調校", font=StockStyle.FONT_BOLD).pack(pady=5)
+        
+        fm = tk.Frame(dialog); fm.pack(padx=10, fill=tk.X)
+        
+        # 基準價 (影響長線)
+        tk.Label(fm, text="基準(參考價):").grid(row=0, column=0, sticky="e", pady=2)
+        e_ref = tk.Entry(fm, width=12); e_ref.insert(0, str(current_ref)); e_ref.grid(row=0, column=1)
+        
+        # 短線預警 (vs 昨收)
+        tk.Label(fm, text="短線預警(vs昨收%):").grid(row=1, column=0, sticky="e", pady=2)
+        e_short = tk.Entry(fm, width=12); e_short.insert(0, str(stock_cfg.get('alert_short', ''))); e_short.grid(row=1, column=1)
+        
+        tk.Label(dialog, text="---------------------------", fg="#ccc").pack()
+        
+        # 長線預警 (vs 基準) - 雙向綁定
+        fm2 = tk.Frame(dialog); fm2.pack(padx=10, fill=tk.X)
+        tk.Label(fm2, text="長線目標價/百分比(vs基準):", font=("Arial", 8, "italic")).grid(row=0, column=0, columnspan=2, pady=(0,5))
+        
+        tk.Label(fm2, text="目標價格:").grid(row=1, column=0, sticky="e")
+        e_target_p = tk.Entry(fm2, width=12); e_target_p.grid(row=1, column=1)
+        
+        tk.Label(fm2, text="變動比例(%):").grid(row=2, column=0, sticky="e")
+        e_target_pct = tk.Entry(fm2, width=12); e_target_pct.grid(row=2, column=1)
+        
+        # 初始填充長線數值
+        curr_long_th = stock_cfg.get('alert_long', self.data_manager.config_data.get('alert_threshold_long', 15.0))
+        e_target_pct.insert(0, str(curr_long_th))
         try:
-            ts = int(time.time() * 1000)
-            url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={'|'.join(query_parts)}&json=1&delay=0&_={ts}"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            
-            with urllib.request.urlopen(req, timeout=5) as res:
-                data = json.loads(res.read())
-                if 'msgArray' in data:
-                    for item in data['msgArray']:
-                        code = item.get('c')
-                        config_symbol = symbol_map.get(code)
-                        if not config_symbol: continue
-                        
-                        curr_str = item.get('z', '-')
-                        if curr_str == '-': curr_str = item.get('b', '-').split('_')[0]
-                        if curr_str == '-': curr_str = item.get('y', '0')
-                        
-                        try:
-                            curr_price = float(curr_str)
-                            prev_close = float(item.get('y', curr_price))
-                            day_high = float(item.get('h', curr_price))
-                            day_low = float(item.get('l', curr_price))
-                            
-                            hint = 2
-                            if "." in curr_str and len(curr_str.split(".")[1]) > 2:
-                                hint = 4
-                                
-                            updates[config_symbol] = (prev_close, curr_price, day_high, day_low, hint)
-                        except:
-                            continue
-        except Exception:
-            pass
-                
-        self.after(0, lambda: self._apply_updates(updates))
+            target_p = current_ref * (1 + curr_long_th/100.0)
+            e_target_p.insert(0, f"{target_p:.2f}")
+        except: pass
+
+        def sync_p_to_pct(ev=None):
+            try:
+                ref = float(e_ref.get())
+                p = float(e_target_p.get())
+                pct = abs((p - ref) / ref * 100)
+                e_target_pct.delete(0, tk.END); e_target_pct.insert(0, f"{pct:.2f}")
+            except: pass
+
+        def sync_pct_to_p(ev=None):
+            try:
+                ref = float(e_ref.get())
+                pct = float(e_target_pct.get())
+                p = ref * (1 + pct / 100.0) # 預設顯示正向目標價
+                e_target_p.delete(0, tk.END); e_target_p.insert(0, f"{p:.2f}")
+            except: pass
+
+        e_target_p.bind("<KeyRelease>", sync_p_to_pct)
+        e_target_pct.bind("<KeyRelease>", sync_pct_to_p)
+
+        def save():
+            try:
+                params = {
+                    "reference": float(e_ref.get()),
+                    "alert_short": float(e_short.get()) if e_short.get() else 5.0,
+                    "alert_long": float(e_target_pct.get()) if e_target_pct.get() else 15.0
+                }
+                if self.data_manager.save_stock_params(symbol, params):
+                    self._build_ui(); self.refresh_prices(); dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("錯誤", f"請檢查欄位格式: {e}")
+
+        btn_fm = tk.Frame(dialog); btn_fm.pack(pady=10)
+        tk.Button(btn_fm, text="儲存", command=save, width=8).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_fm, text="取消", command=dialog.destroy, width=8).pack(side=tk.LEFT, padx=5)
+
+
+    def _show_global_config_dialog(self):
+        # 實現 Toggle 邏輯
+        trigger_id = "GLOBAL_CONFIG"
+        if self.active_dialog and self.active_dialog.winfo_exists():
+            is_same = (self.active_trigger == trigger_id)
+            self.active_dialog.destroy()
+            self.active_dialog = None
+            self.active_trigger = None
+            if is_same: return
+
+        dialog = tk.Toplevel(self)
+        self.active_dialog = dialog
+        self.active_trigger = trigger_id
         
-    def _apply_updates(self, updates):
-        if self.is_collapsed or not self.labels:
-            pass
-        elif updates:
-            bg_col = self.master.cget("bg")
-            for symbol, (prev_val, curr_val, high_val, low_val, hint) in updates.items():
-                if symbol in self.labels:
-                    prev_lbl, curr_lbl, bar_canvas, hl_text_lbl = self.labels[symbol]
-                    if not curr_lbl.winfo_exists(): continue
-                    
-                    if prev_val == "ERR":
-                        prev_lbl.config(text="N/A")
-                        curr_lbl.config(text="N/A")
-                        hl_text_lbl.config(text="")
-                        bar_canvas.delete("all")
-                    else:
-                        fmt = "{:.2f}"
-                        prev_lbl.config(text=fmt.format(prev_val))
-                        
-                        # 恢復極簡的灰色顏色設定
-                        color = "#b0b0b0"
-                        bg_line_color = "#e0e0e0"
-                        cur_line_color = "#c0c0c0"
-                        
-                        curr_lbl.config(text=fmt.format(curr_val), fg=color)
-                        
-                        # 計算漲跌幅 %
-                        diff_pct = 0.0
-                        if prev_val > 0:
-                            diff_pct = (curr_val - prev_val) / prev_val * 100.0
-                            
-                        # 顯示漲跌幅
-                        hl_text_lbl.config(text=f"{diff_pct:+.2f}%", fg=color)
-                        
-                        if high_val and low_val:
-                            bar_canvas.delete("all")
-                            w = int(bar_canvas.cget("width"))
-                            h = int(bar_canvas.cget("height"))
-                            
-                            # 計算今日震幅比例
-                            range_val = high_val - low_val
-                            range_pct = (range_val / prev_val * 100.0) if prev_val > 0 else 0
-                            
-                            # 非線性縮放：5% 以上為 100% 寬度，以下依 0.7 次方縮減
-                            scale_factor = min(1.0, (range_pct / 5.0) ** 0.7) if range_pct > 0 else 0.05
-                            
-                            # 計算動態繪圖區域 (置中)
-                            usable_w = (w - 10) * scale_factor
-                            if usable_w < 4: usable_w = 4
-                            start_x = (w - usable_w) / 2
-                            
-                            def get_x(v):
-                                # 若數值在當前高低範圍內，映射到 start_x ~ start_x + usable_w
-                                # 若昨收(v)在範圍外，它會被正確推向兩邊
-                                if high_val > low_val:
-                                    return start_x + (v - low_val) / (high_val - low_val) * usable_w
-                                else:
-                                    return w // 2
-                                
-                            x_low = get_x(low_val)
-                            x_high = get_x(high_val)
-                            x_prev = get_x(prev_val)
-                            x_curr = get_x(curr_val)
-                            
-                            # 繪製灰色背景軌道線 (今日震幅區間)
-                            bar_canvas.create_line(x_low, h//2, x_high, h//2, fill=bg_line_color, width=4, capstyle=tk.ROUND)
-                            
-                            # 繪製昨日收盤價的刻度線 (直線)
-                            bar_canvas.create_line(x_prev, 3, x_prev, h-3, fill=cur_line_color, width=2)
-                            
-                            # 繪製代表現在價位的圖示
-                            if curr_val > prev_val:
-                                # 價格上漲 (大於昨日收盤)，三角形頭部指向遠離昨日價格 (向右)
-                                bar_canvas.create_polygon(
-                                    x_curr + 5, h//2, 
-                                    x_curr - 4, h//2 - 5, 
-                                    x_curr - 4, h//2 + 5, 
-                                    fill="", outline=color, width=2
-                                )
-                            elif curr_val < prev_val:
-                                # 價格下跌 (小於昨日收盤)，三角形頭部指向遠離昨日價格 (向左)
-                                bar_canvas.create_polygon(
-                                    x_curr - 5, h//2, 
-                                    x_curr + 4, h//2 - 5, 
-                                    x_curr + 4, h//2 + 5, 
-                                    fill="", outline=color, width=2
-                                )
-                            else:
-                                # 價格持平，空心圓球
-                                bar_canvas.create_oval(x_curr-4, h//2-4, x_curr+4, h//2+4, fill="", outline=color, width=2)
-                            
-                        else:
-                            bar_canvas.delete("all")
-                    
-        if self.update_interval_ms > 0:
-            self._update_job = self.after(self.update_interval_ms, self.update_prices)
+        dialog.title("全局股票設定")
+
+        # 置中於螢幕 - 調大高度以容納路徑資訊
+        w, h = 260, 320
+        sw = dialog.winfo_screenwidth()
+        sh = dialog.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 2
+        dialog.geometry(f"{w}x{h}+{x}+{y}")
+        dialog.attributes("-topmost", True)
+
+        
+        bg = self.cget("bg")
+        tk.Label(dialog, text="全局預設參數", font=StockStyle.FONT_BOLD).pack(pady=10)
+        
+        fm = tk.Frame(dialog); fm.pack(padx=20)
+        cfg = self.data_manager.config_data
+        
+        tk.Label(fm, text="預設短預警(%):").grid(row=0, column=0, sticky="e", pady=2)
+        e_s = tk.Entry(fm, width=8); e_s.insert(0, str(cfg.get('alert_threshold_short', 5.0))); e_s.grid(row=0, column=1)
+        
+        tk.Label(fm, text="預設長預警(%):").grid(row=1, column=0, sticky="e", pady=2)
+        e_l = tk.Entry(fm, width=8); e_l.insert(0, str(cfg.get('alert_threshold_long', 15.0))); e_l.grid(row=1, column=1)
+        
+        tk.Label(fm, text="顏色強度(0-2):").grid(row=2, column=0, sticky="e", pady=2)
+        e_i = tk.Entry(fm, width=8); e_i.insert(0, str(cfg.get('color_intensity', 1.0))); e_i.grid(row=2, column=1)
+
+        def save():
+            try:
+                new_cfg = {
+                    "alert_threshold_short": float(e_s.get()),
+                    "alert_threshold_long": float(e_l.get()),
+                    "color_intensity": float(e_i.get())
+                }
+                if self.data_manager.update_global_config(new_cfg):
+                    self._build_ui(); self.refresh_prices(); dialog.destroy()
+            except: messagebox.showerror("錯誤", "請輸入有效數字")
+
+        btn_fm = tk.Frame(dialog); btn_fm.pack(pady=15)
+        tk.Button(btn_fm, text="儲存", command=save, width=10).pack(side=tk.LEFT, padx=5)
+
+        # --- 新增：程式位置展示區 ---
+        tk.Label(dialog, text="---------------------------", fg="#ccc").pack()
+        tk.Label(dialog, text="程式位置 (可找到設定檔):", font=("Arial", 8, "italic"), fg="#888888").pack()
+        
+        app_path = os.path.dirname(os.path.abspath(self.data_manager.config_path))
+        path_lbl = tk.Label(dialog, text=app_path, font=("Arial", 7), fg="#999999", wraplength=220, justify="center")
+        path_lbl.pack(padx=10)
+        
+        def open_folder():
+            try:
+                os.startfile(app_path)
+            except:
+                pass
+                
+        tk.Button(dialog, text="📁 開啟程式資料夾", font=("Arial", 8), command=open_folder, 
+                  relief=tk.FLAT, fg="#6666ff", cursor="hand2").pack(pady=5)
+
+

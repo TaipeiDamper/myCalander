@@ -177,11 +177,13 @@ class MatrixView:
             self.on_edit(selected_t)
             
     def _on_canvas_click(self, todo_id, event=None):
-        # 初始化拖曳數據
+        # 初始化拖曳數據：必須記錄點擊當下的滑鼠座標
         if event:
             self.drag_data["id"] = todo_id
             self.drag_data["x"] = event.x
             self.drag_data["y"] = event.y
+            self.drag_data["start_x"] = event.x
+            self.drag_data["start_y"] = event.y
 
         # 如果點擊的是已經選中的，我們嘗試找尋重疊的下一個
         if todo_id == self.selected_todo_id and event:
@@ -368,22 +370,20 @@ class MatrixView:
 
     def _on_drag(self, event, tid):
         if self.drag_data["id"] is None:
-            self.drag_data["id"] = tid
-            self.drag_data["x"] = event.x
-            self.drag_data["y"] = event.y
             return
 
+        # 計算滑鼠位移量
         dx = event.x - self.drag_data["x"]
         dy = event.y - self.drag_data["y"]
         
         if dx == 0 and dy == 0:
             return
             
+        # 更新該任務的累積偏移量 (offsets)
         old_off = self.offsets.get(tid, (0, 0))
-        new_off = (old_off[0] + dx, old_off[1] + dy)
-        self.offsets[tid] = new_off
+        self.offsets[tid] = (old_off[0] + dx, old_off[1] + dy)
         
-        # 實時移動畫布上的元件
+        # 實時移動畫布上的所有帶有此 todo ID tag 的元件 (橢圓與文字)
         obj_tag = f"todo_{tid}"
         self.canvas.move(obj_tag, dx, dy)
         
@@ -391,11 +391,12 @@ class MatrixView:
         dash_tag = f"dash_{tid}"
         self.canvas.move(dash_tag, dx, dy)
         
+        # 更新最後一次的滑鼠座標，以便下次計算相對位移
         self.drag_data["x"] = event.x
         self.drag_data["y"] = event.y
 
     def _on_drag_release(self, event):
-        if self.drag_data["id"]:
-            # 釋放後才重新繪製，以正確顯示軌跡虛線等
+        if self.drag_data["id"] is not None:
+            # 拖曳結束，刷新畫布以確保軌跡連線與標記正確
             self._draw_matrix()
         self.drag_data["id"] = None

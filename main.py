@@ -12,10 +12,8 @@ from stock.stock_widget import HiddenStockWidget
 from weather.weather_widget import HiddenWeatherWidget
 from core.clock_widget import ClockPomodoroWidget
 from core.sidebar import AppSidebar
+from stock.stock_notification import StockNotificationSidebar
 
-class TodoApp:
-    """Todo List 應用程式主類別"""
-    
 class TodoApp:
     """Todo List 應用程式主類別"""
     
@@ -60,18 +58,27 @@ class TodoApp:
         
         self.matrix_add_btn = ttk.Button(self.switch_frame, text="新增任務", command=self._on_add_todo)
         # matrix_add_btn 先不 pack，進入矩陣視圖時才顯示
+
+        # 股票預警圖示 (預設隱藏)
+        self.alert_btn = tk.Label(self.header, text="⚠️", font=("Arial", 16), fg="#d32f2f", cursor="hand2")
+        self.alert_btn.pack(side=tk.RIGHT, padx=10)
+        self.alert_btn.pack_forget()
+        self.alert_btn.bind("<Button-1>", self._on_alert_click)
+        self.current_alerts = []
+
         
         # 中央主體導航列元件 (提供給月曆用)
         self.nav_frame = tk.Frame(self.header)
         self.nav_frame.pack(expand=True)
         
         # --- 中央主容器 ---
-        self.main_container = tk.Frame(root)
+        self.main_container = tk.Frame(self.root)
         self.main_container.pack(fill=tk.BOTH, expand=True)
         
         # 側邊欄功能註冊
         self.weather_sidebar = self.sidebar.register_widget("詳細天氣", lambda p: HiddenWeatherWidget(p, mode="sidebar"))
         self.pomo_widget = self.sidebar.register_widget("番茄鐘控制", lambda p: ClockPomodoroWidget(p, on_activate=lambda: self.sidebar.show_only("番茄鐘控制")))
+        self.stock_notify_sidebar = self.sidebar.register_widget("投資通知", lambda p: StockNotificationSidebar(p))
 
         # 初始化視圖
         self.calendar_view = CalendarView(
@@ -85,8 +92,14 @@ class TodoApp:
         self.current_view = "calendar"
         self.selected_date = None
         
-        self.stock_widget = HiddenStockWidget(self.root)
+        # 將通知切換功能傳入股票小工具
+        self.stock_widget = HiddenStockWidget(
+            self.root, 
+            on_notify_toggle=lambda: self.sidebar.toggle_widget("投資通知"),
+            on_alert=self._handle_stock_alerts
+        )
         self.stock_widget.place(relx=0.99, rely=0.99, anchor="se")
+
         self.stock_widget.lift()
     
     def show_calendar_view(self):
@@ -245,7 +258,24 @@ class TodoApp:
             if self.matrix_view:
                 self.matrix_view.update_todos(self.todos)
     
+    def _handle_stock_alerts(self, alerts):
+        """處理來自股票小工具的預警"""
+        self.current_alerts = alerts
+        if alerts:
+            self.alert_btn.pack(side=tk.RIGHT, padx=10)
+            # 如果側邊欄已經開著預警，即時更新它
+            if self.sidebar.state() == "normal":
+                self.stock_notify_sidebar.update_info(alerts)
+        else:
+            self.alert_btn.pack_forget()
+
+    def _on_alert_click(self, event=None):
+        """點擊預警圖示：打開側邊欄並顯示詳細資訊"""
+        self.sidebar.show_only("投資通知")
+        self.stock_notify_sidebar.update_info(self.current_alerts)
+
     def on_closing(self):
+
         """處理視窗關閉事件"""
         # 儲存資料
         save_todos(self.todos)
