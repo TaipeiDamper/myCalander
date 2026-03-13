@@ -9,8 +9,8 @@ class StockStyle:
     """集中管理 UI 配色與樣式"""
     PRIMARY_GREY = "#d0d0d0"
     HOVER_GREY = "#888888"
-    BAR_TRACK = "#f2f2f2"
-    BAR_GUIDE = "#e5e5e5"
+    BAR_TRACK = "#e0e0e0"
+    BAR_GUIDE = "#d0d0d0"
     TEXT_POPUP = "#444444"
     FONT_MAIN = ("Arial", 9)
     FONT_SMALL = ("Arial", 7)
@@ -90,17 +90,15 @@ class HiddenStockWidget(tk.Frame):
             curr_lbl = tk.Label(self, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
             curr_lbl.grid(row=i, column=3, padx=4, sticky="e")
             
-            canvas = tk.Canvas(self, width=75, height=20, bg=bg, highlightthickness=0, cursor="hand2")
+            canvas = tk.Canvas(self, width=80, height=24, bg=bg, highlightthickness=0, cursor="hand2")
             canvas.grid(row=i, column=4, padx=5, sticky="w")
             canvas.bind("<Button-1>", lambda e, c=canvas: self._on_bar_click(e, c))
+            canvas.bind("<Leave>", lambda e, c=canvas: self._hide_temp_val(c))
             
             diff_lbl = tk.Label(self, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, justify="left")
             diff_lbl.grid(row=i, column=5, padx=2, sticky="w")
             
             self.labels[symbol] = (prev_lbl, curr_lbl, canvas, diff_lbl)
-            
-            # 全部綁定手動更新（除了一些特殊按鈕）
-            for w in (curr_lbl, prev_lbl, diff_lbl): w.bind("<Button-1>", self.manual_update)
 
         # 底部控制鈕
         btn_row = len(stocks)
@@ -203,30 +201,46 @@ class HiddenStockWidget(tk.Frame):
         canvas.create_line(xl, h/2, xh, h/2, fill=StockStyle.BAR_TRACK, width=4, capstyle=tk.ROUND)
         # 端點
         for x in (xl, xh): canvas.create_oval(x-2, h/2-2, x+2, h/2+2, fill="#eeeeee", outline="")
-        # 昨收線
-        canvas.create_line(xp, 3, xp, h-3, fill=StockStyle.BAR_GUIDE, width=2)
+        # 昨收線：改為寬度 1 並使用虛線，減少視覺重量
+        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.BAR_GUIDE, width=1, dash=(2, 2))
         
-        # 三角形指示
+        # 指示器：縮小尺寸並加入淺色填充，改善重疊感
         if curr != prev:
-            points = [xc+5, h/2, xc-4, h/2-5, xc-4, h/2+5] if curr > prev else [xc-5, h/2, xc+4, h/2-5, xc+4, h/2+5]
-            canvas.create_polygon(points, fill="", outline=StockStyle.PRIMARY_GREY, width=1)
+            # 寬度從 9 改為 7, 高度從 10 改為 8
+            points = [xc+4, h/2, xc-3, h/2-4, xc-3, h/2+4] if curr > prev else [xc-4, h/2, xc+3, h/2-4, xc+3, h/2+4]
+            canvas.create_polygon(points, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
         else:
-            canvas.create_oval(xc-4, h/2-4, xc+4, h/2+4, fill="", outline=StockStyle.PRIMARY_GREY, width=1)
+            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
 
     def _on_bar_click(self, event, canvas):
         if hasattr(canvas, "stock_coords"):
             coords = canvas.stock_coords
-            if event.x < canvas.winfo_width() / 2:
+            # 改為判斷距離點擊位置最近的座標 (L 或 H)
+            dist_l = abs(event.x - coords['x_low'])
+            dist_h = abs(event.x - coords['x_high'])
+            
+            if dist_l < dist_h:
                 self._show_temp_val(canvas, f"L:{coords['low']:.2f}", coords['x_low'])
             else:
                 self._show_temp_val(canvas, f"H:{coords['high']:.2f}", coords['x_high'])
             return
-        self.manual_update()
 
     def _show_temp_val(self, canvas, text, x):
-        canvas.delete("temp_val")
+        self._hide_temp_val(canvas) # 先清除舊的
+        
+        # 顯示數值，座標上移一點預留間距
         canvas.create_text(x, 6, text=text, fill=StockStyle.TEXT_POPUP, font=StockStyle.FONT_BOLD, tags="temp_val")
-        self.after(3000, lambda: canvas.delete("temp_val"))
+        
+        # 設定自動消失計時器
+        timer_id = self.after(3000, lambda: self._hide_temp_val(canvas))
+        canvas.hide_timer = timer_id
+
+    def _hide_temp_val(self, canvas):
+        """隱藏暫時顯示的數值並取消計時器"""
+        canvas.delete("temp_val")
+        if hasattr(canvas, "hide_timer") and canvas.hide_timer:
+            self.after_cancel(canvas.hide_timer)
+            canvas.hide_timer = None
 
     def _show_edit_dialog(self, event, symbol, current_ref, stock_cfg):
         # 實現 Toggle 邏輯：按第二次就收回
@@ -394,5 +408,3 @@ class HiddenStockWidget(tk.Frame):
                 
         tk.Button(dialog, text="📁 開啟程式資料夾", font=("Arial", 8), command=open_folder, 
                   relief=tk.FLAT, fg="#6666ff", cursor="hand2").pack(pady=5)
-
-

@@ -187,25 +187,46 @@ class HiddenWeatherWidget(tk.Frame):
             self.after(0, lambda: self._apply_updates(None))
 
     def _apply_updates(self, daily):
-        if daily:
-            times = daily.get("time", [])
-            codes = daily.get("weather_code", [])
-            t_max = daily.get("temperature_2m_max", [])
-            t_min = daily.get("temperature_2m_min", [])
-            p_prob = daily.get("precipitation_probability_max", [])
-            days = ["今", "明", "後"]
-            
-            if hasattr(self, 'collapsed_lbl') and self.collapsed_lbl.winfo_exists():
-                icon = WEATHER_CODES.get(codes[0], "未知") if codes else "未知"
-                self.collapsed_lbl.config(text=f"☁️ {icon} {int(round(t_min[0]))}~{int(round(t_max[0]))}°C")
-
-            for i in range(min(3, len(times))):
-                if i < len(self.labels):
-                    day_lbl, icon_lbl, temp_lbl, rain_lbl = self.labels[i]
-                    if day_lbl.winfo_exists():
-                        day_lbl.config(text=f"{days[i]}")
-                        icon_lbl.config(text=WEATHER_CODES.get(codes[i], "-"))
-                        temp_lbl.config(text=f"{int(round(t_min[i]))}~{int(round(t_max[i]))}°C")
-                        rain_lbl.config(text=f"☔{p_prob[i]}%")
+        next_delay = self.update_interval_ms
         
-        self._update_job = self.after(self.update_interval_ms, self.update_weather)
+        if daily and daily.get("time"):
+            try:
+                times = daily.get("time", [])
+                codes = daily.get("weather_code", [])
+                t_max = daily.get("temperature_2m_max", [])
+                t_min = daily.get("temperature_2m_min", [])
+                p_prob = daily.get("precipitation_probability_max", [])
+                days = ["今", "明", "後"]
+                
+                if hasattr(self, 'collapsed_lbl') and self.collapsed_lbl.winfo_exists():
+                    if codes and t_min and t_max:
+                        icon_text = WEATHER_CODES.get(codes[0], "未知")
+                        self.collapsed_lbl.config(text=f"☁️ {icon_text} {int(round(t_min[0]))}~{int(round(t_max[0]))}°C")
+                    else:
+                        self.collapsed_lbl.config(text="今日天氣: 數據異常")
+
+                for i in range(min(3, len(times))):
+                    if i < len(self.labels):
+                        day_lbl, icon_lbl, temp_lbl, rain_lbl = self.labels[i]
+                        if day_lbl.winfo_exists():
+                            day_lbl.config(text=f"{days[i]}")
+                            # 額外檢查索引
+                            w_code = codes[i] if i < len(codes) else -1
+                            w_min = t_min[i] if i < len(t_min) else 0
+                            w_max = t_max[i] if i < len(t_max) else 0
+                            w_rain = p_prob[i] if i < len(p_prob) else 0
+                            
+                            icon_lbl.config(text=WEATHER_CODES.get(w_code, "-"))
+                            temp_lbl.config(text=f"{int(round(w_min))}~{int(round(w_max))}°C")
+                            rain_lbl.config(text=f"☔{w_rain}%")
+            except Exception as e:
+                print(f"Apply updates error: {e}")
+                if hasattr(self, 'collapsed_lbl'): self.collapsed_lbl.config(text="今日天氣: 顯示出錯")
+                next_delay = 300000 # 出錯則 5 分鐘後重試
+        else:
+            # daily 為 None 或無 time 數據
+            if hasattr(self, 'collapsed_lbl'):
+                self.collapsed_lbl.config(text="今日天氣: 載入失敗，稍後重試")
+            next_delay = 300000 # 失敗則 5 分鐘後重試
+        
+        self._update_job = self.after(next_delay, self.update_weather)

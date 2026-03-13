@@ -244,8 +244,8 @@ class CalendarView:
                 all_completed = all(t.completed for t in day_todos_sorted)
                 
                 prefix = "✓ " if first_todo.completed else ""
-                # 如果加上 ✓ 前綴，為了排版好看，標題擷取可稍微縮短
-                btn_text = f"{day}\n{prefix}{first_todo.title[:5]}"
+                # 如果加上 ✓ 前綴，可稍微增加長度
+                btn_text = f"{day}\n{prefix}{first_todo.title[:10]}"
                 
                 if len(day_todos_sorted) > 1:
                     btn_text += f"\n(+{len(day_todos_sorted)-1})"
@@ -253,7 +253,7 @@ class CalendarView:
                 all_completed = False
                 btn_text = str(day)
                 if holiday_desc:
-                    btn_text += f"\n{holiday_desc[:5]}"
+                    btn_text += f"\n{holiday_desc[:8]}"
             
             # 建立按鈕
             btn = tk.Button(
@@ -422,5 +422,3 @@ class CalendarView:
     def get_frame(self) -> ttk.Frame:
         """取得框架元件"""
         return self.frame
-
-

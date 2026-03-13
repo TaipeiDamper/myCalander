@@ -6,11 +6,11 @@
       "content": "test",
       "date": "2026-03-09",
       "time": "11:49",
-      "completed": false,
+      "completed": true,
       "importance": 4,
       "time_sensitivity": 10,
       "order": 0,
-      "completion_time": null
+      "completion_time": "2026-03-12 11:25:12"
     },
     {
       "id": "todo_20260306114942267668",
@@ -38,7 +38,7 @@
     },
     {
       "id": "todo_20260306172501322422",
-      "title": "testest",
+      "title": "looooooooong name",
       "content": "test",
       "date": "2026-03-26",
       "time": "17:24",

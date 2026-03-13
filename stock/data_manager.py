@@ -168,5 +168,11 @@ class StockDataManager:
         high_val = parse_f(item.get('h'), curr_val)
         low_val = parse_f(item.get('l'), curr_val)
         
-        hint = 4 if "." in str(curr_str) and len(str(curr_str).split(".")[1]) > 2 else 2
+        try:
+            # 先轉 float 去掉無效尾隨零，再轉 string 判斷小數位
+            clean_str = str(float(curr_str))
+            hint = len(clean_str.split(".")[1]) if "." in clean_str else 0
+            hint = max(2, hint) # 最少顯示兩位
+        except:
+            hint = 2
         return (prev_val, curr_val, high_val, low_val, hint)
