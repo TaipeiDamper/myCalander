@@ -16,8 +16,6 @@ class MatrixView:
         self.selected_todo_id = None
         self.max_days = 14
         self.sort_mode = "date" # "date" or "importance"
-        self.drag_data = {"x": 0, "y": 0, "item": None, "id": None}
-        self.offsets = {} # 暫時的拖曳位移量 {todo_id: (dx, dy)}
         
         self._build_ui()
         self.update_todos(self.todos)
@@ -82,8 +80,6 @@ class MatrixView:
         ttk.Radiobutton(ctrl_frame, text="按日期", variable=self.sort_var, value="date", command=self._refresh_lists).pack(side=tk.LEFT, padx=5)
         ttk.Radiobutton(ctrl_frame, text="按重要性", variable=self.sort_var, value="importance", command=self._refresh_lists).pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(ctrl_frame, text="重新整理 (回到原位)", command=self._reset_positions).pack(side=tk.LEFT, padx=10)
-        
         self.canvas = tk.Canvas(self.bottom_frame, bg="#ffffff", highlightthickness=1, highlightbackground="#cccccc")
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.canvas.bind("<Configure>", lambda e: self._draw_matrix())
@@ -98,10 +94,6 @@ class MatrixView:
                 self._draw_matrix()
         except ValueError:
             pass
-            
-    def _reset_positions(self):
-        self.offsets = {}
-        self._draw_matrix()
 
     def update_todos(self, todos):
         self.all_todos = todos # 保留所有任務以篩選已完成
@@ -177,14 +169,6 @@ class MatrixView:
             self.on_edit(selected_t)
             
     def _on_canvas_click(self, todo_id, event=None):
-        # 初始化拖曳數據：必須記錄點擊當下的滑鼠座標
-        if event:
-            self.drag_data["id"] = todo_id
-            self.drag_data["x"] = event.x
-            self.drag_data["y"] = event.y
-            self.drag_data["start_x"] = event.x
-            self.drag_data["start_y"] = event.y
-
         # 如果點擊的是已經選中的，我們嘗試找尋重疊的下一個
         if todo_id == self.selected_todo_id and event:
             # 尋找鼠標位置附近的所有項目
@@ -256,9 +240,9 @@ class MatrixView:
         mid_y = h - pad_y - (5 - 1) / 9.0 * plot_h
         mid_x = pad_x + plot_w / 2.0
         
-        # 畫四象限的區分虛線 (顏色加深)
-        self.canvas.create_line(pad_x, mid_y, w - pad_x, mid_y, fill="#666666", dash=(4, 4))
-        self.canvas.create_line(mid_x, pad_y, mid_x, h - pad_y, fill="#666666", dash=(4, 4))
+        # 畫四象限的區分線 (改為實線且極淡)
+        self.canvas.create_line(pad_x, mid_y, w - pad_x, mid_y, fill="#eeeeee", width=1)
+        self.canvas.create_line(mid_x, pad_y, mid_x, h - pad_y, fill="#eeeeee", width=1)
         
         # 軸線 (X=時間 Y=重要性)
         self.canvas.create_line(pad_x, h - pad_y, w - pad_x, h - pad_y, fill="#999999", width=2, arrow=tk.LAST)
@@ -310,21 +294,24 @@ class MatrixView:
                 orig_y = h - pad_y - ((base_imp - 1) / 9.0) * plot_h
                 start_x = pad_x + plot_w  # 最遠的地方
                 
-                # 繪製移動軌跡 (示意從無時間加成的原本位置 到 現在位置的軌跡)
-                self.canvas.create_line(start_x, orig_y, x, y, fill="#e0e0e0", dash=(2, 4))
+                # 決定顏色 (HSV 漸層邏輯)
+                # 左上 (x_ratio=0, imp_score=1) 最純最亮紅
+                # 下方 (imp_score=0) 趨於暗色
+                # 右方 (x_ratio=1) 趨於淺且安全的淡藍灰色
                 
-                # 決定顏色
-                # 最左上 (x=0, y=0) 最鮮豔 (#FF0000)
+                # 計算頂部 (Top, Y=1) 在左右移動時的顏色過渡
+                r_top = 255 + (180 - 255) * x_ratio
+                g_top = 0 + (200 - 0) * x_ratio
+                b_top = 0 + (220 - 0) * x_ratio
+                
+                # 計算當前重要性比例 (1~10 映射到 0~1)
                 imp_score = (eff_imp - 1) / 9.0
-                urg_score = 1.0 - x_ratio
                 
-                # 色彩分布更極端一點：左上強紅
-                color_factor = (imp_score * urg_score) ** 0.3 
-                
-                # 從淡灰 (180, 180, 180) 到 純紅 (255, 0, 0)
-                r_val = int(180 + (255 - 180) * color_factor)
-                g_val = int(180 + (0 - 180) * color_factor)
-                b_val = int(180 + (0 - 180) * color_factor)
+                # 計算最終顏色 (由頂部 Top 往底部 Bottom 全黑/暗色 過渡)
+                # 底色設為深灰色 (20, 20, 20)
+                r_val = int(20 + (r_top - 20) * imp_score)
+                g_val = int(20 + (g_top - 20) * imp_score)
+                b_val = int(20 + (b_top - 20) * imp_score)
                 color = f"#{r_val:02x}{g_val:02x}{b_val:02x}"
                 
                 is_selected = (t.id == self.selected_todo_id)
@@ -335,68 +322,23 @@ class MatrixView:
                 outline = "#000000" if is_selected else color
                 width = 2 if is_selected else 1
                 
-                # 取得拖曳偏移量
-                off_x, off_y = self.offsets.get(t.id, (0, 0))
-                draw_x = x + off_x
-                draw_y = y + off_y
-                
-                # 使用 tag 標記 todo ID，方便重疊點選與拖曳
+                # 使用 tag 標記 todo ID，方便重疊點選
                 obj_tag = f"todo_{t.id}"
-                dash_tag = f"dash_{t.id}"
                 
-                # 繪製拖曳軌跡 (與原點連線)
-                if off_x != 0 or off_y != 0:
-                    dash_color = f"#{int(r_val*0.7):02x}{int(g_val*0.7):02x}{int(b_val*0.7):02x}"
-                    self.canvas.create_line(x, y, draw_x, draw_y, fill=dash_color, dash=(2, 2), tags=(dash_tag,))
-                
-                item_id = self.canvas.create_oval(draw_x-r, draw_y-r, draw_x+r, draw_y+r, fill=color, outline=outline, width=width, tags=(obj_tag,))
-                text_id = self.canvas.create_text(draw_x, draw_y-r-8, text=t.title[:5], font=("Arial", 8, "bold" if is_selected else "normal"), tags=(obj_tag,))
+                item_id = self.canvas.create_oval(x-r, y-r, x+r, y+r, fill=color, outline=outline, width=width, tags=(obj_tag,))
+                text_id = self.canvas.create_text(x, y-r-8, text=t.title[:5], font=("Arial", 8, "bold" if is_selected else "normal"), tags=(obj_tag,))
                 
                 if is_selected:
                     self.canvas.tag_raise(obj_tag)
                 
-                # 綁定事件
+                # 綁定事件 (移除拖曳綁定)
                 for i_id in (item_id, text_id):
                     self.canvas.tag_bind(i_id, "<Button-1>", lambda e, tid=t.id: self._on_canvas_click(tid, e))
-                    self.canvas.tag_bind(i_id, "<B1-Motion>", lambda e, tid=t.id: self._on_drag(e, tid))
-                    self.canvas.tag_bind(i_id, "<ButtonRelease-1>", lambda e: self._on_drag_release(e))
                     self.canvas.tag_bind(i_id, "<Double-1>", lambda e, tid=t.id: self._on_canvas_double_click(tid))
                     self.canvas.tag_bind(i_id, "<Enter>", lambda e, i=item_id: self.canvas.config(cursor="hand2"))
                     self.canvas.tag_bind(i_id, "<Leave>", lambda e, i=item_id: self.canvas.config(cursor=""))
 
                     
             except Exception as e:
-                pass
+                print(f"Error drawing todo {t.title}: {e}")
 
-    def _on_drag(self, event, tid):
-        if self.drag_data["id"] is None:
-            return
-
-        # 計算滑鼠位移量
-        dx = event.x - self.drag_data["x"]
-        dy = event.y - self.drag_data["y"]
-        
-        if dx == 0 and dy == 0:
-            return
-            
-        # 更新該任務的累積偏移量 (offsets)
-        old_off = self.offsets.get(tid, (0, 0))
-        self.offsets[tid] = (old_off[0] + dx, old_off[1] + dy)
-        
-        # 實時移動畫布上的所有帶有此 todo ID tag 的元件 (橢圓與文字)
-        obj_tag = f"todo_{tid}"
-        self.canvas.move(obj_tag, dx, dy)
-        
-        # 同步移動虛線 (如果有)
-        dash_tag = f"dash_{tid}"
-        self.canvas.move(dash_tag, dx, dy)
-        
-        # 更新最後一次的滑鼠座標，以便下次計算相對位移
-        self.drag_data["x"] = event.x
-        self.drag_data["y"] = event.y
-
-    def _on_drag_release(self, event):
-        if self.drag_data["id"] is not None:
-            # 拖曳結束，刷新畫布以確保軌跡連線與標記正確
-            self._draw_matrix()
-        self.drag_data["id"] = None

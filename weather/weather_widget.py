@@ -101,25 +101,46 @@ class HiddenWeatherWidget(tk.Frame):
         self.config(bg="#ffffff")
         self.labels.clear()
         
-        # 數據顯示區
+        # 數據顯示區：直接在一個容器內用 grid 統一控制
         self.content_frame = tk.Frame(self, bg="#ffffff")
-        self.content_frame.pack(padx=5, pady=5)
+        self.content_frame.pack(padx=10, pady=10)
+        
+        # 設定列寬，確保每一列都對齊 (修正寬度避免右側被切掉)
+        self.content_frame.columnconfigure(0, minsize=30)  # 日期 (今/明/後)
+        self.content_frame.columnconfigure(1, minsize=25)  # 圖示 (Emoji)
+        self.content_frame.columnconfigure(2, minsize=50)  # 狀態描述
+        self.content_frame.columnconfigure(3, minsize=65)  # 氣溫
+        self.content_frame.columnconfigure(4, minsize=35)  # 降雨率
         
         for i in range(3):
-            row = tk.Frame(self.content_frame, bg="#ffffff")
-            row.pack(fill=tk.X, pady=2)
-            day_lbl = tk.Label(row, text="-", font=("Arial", 8, "bold"), bg="#ffffff", width=3)
-            day_lbl.pack(side="left")
-            icon_lbl = tk.Label(row, text="-", font=("Arial", 9), bg="#ffffff", width=8)
-            icon_lbl.pack(side="left")
-            temp_lbl = tk.Label(row, text="-", font=("Arial", 8), fg="#D84315", bg="#ffffff")
-            temp_lbl.pack(side="left", padx=5)
-            rain_lbl = tk.Label(row, text="-", font=("Arial", 8), fg="#1565C0", bg="#ffffff")
-            rain_lbl.pack(side="left")
-            self.labels.append((day_lbl, icon_lbl, temp_lbl, rain_lbl))
+            # 日期
+            day_lbl = tk.Label(self.content_frame, text="-", font=("Microsoft JhengHei", 9, "bold"), bg="#ffffff", anchor="w")
+            day_lbl.grid(row=i, column=0, sticky="w", pady=5)
+            
+            # 圖示
+            icon_lbl = tk.Label(self.content_frame, text="-", font=("Segoe UI Emoji", 10), bg="#ffffff", anchor="w")
+            icon_lbl.grid(row=i, column=1, sticky="w", pady=5)
+            
+            # 狀態文字
+            desc_lbl = tk.Label(self.content_frame, text="-", font=("Microsoft JhengHei", 9), bg="#ffffff", anchor="w")
+            desc_lbl.grid(row=i, column=2, sticky="w", pady=5)
+            
+            # 氣溫
+            temp_lbl = tk.Label(self.content_frame, text="-", font=("Arial", 9), fg="#D84315", bg="#ffffff", anchor="w")
+            temp_lbl.grid(row=i, column=3, sticky="w", pady=5)
+            
+            # 降雨率
+            rain_lbl = tk.Label(self.content_frame, text="-", font=("Arial", 9), fg="#1565C0", bg="#ffffff", anchor="w")
+            rain_lbl.grid(row=i, column=4, sticky="w", pady=5)
+            
+            self.labels.append((day_lbl, icon_lbl, desc_lbl, temp_lbl, rain_lbl))
+            
+        # 分隔線
+        tk.Frame(self, bg="#eeeeee", height=1).pack(fill=tk.X, pady=10)
             
         # 設定按鈕
-        self.settings_btn = tk.Button(self, text="⚙️ 設定位置", command=self._toggle_settings, font=("Arial", 8), bg="#f8f9fa")
+        self.settings_btn = tk.Button(self, text="⚙️ 設定天氣位置", command=self._toggle_settings, 
+                                     font=("Microsoft JhengHei", 8), bg="#f8f9fa", relief=tk.FLAT, bd=1)
         self.settings_btn.pack(pady=5)
         
         # 隱藏的設定區域
@@ -285,7 +306,7 @@ class HiddenWeatherWidget(tk.Frame):
                     
                     for i in range(min(3, len(times))):
                         if i < len(self.labels):
-                            day_lbl, icon_lbl, temp_lbl, rain_lbl = self.labels[i]
+                            day_lbl, icon_lbl, desc_lbl, temp_lbl, rain_lbl = self.labels[i]
                             if day_lbl.winfo_exists():
                                 day_lbl.config(text=f"{days[i]}")
                                 w_code = codes[i] if i < len(codes) else -1
@@ -293,8 +314,9 @@ class HiddenWeatherWidget(tk.Frame):
                                 w_max = t_max[i] if i < len(t_max) else 0
                                 w_rain = p_prob[i] if i < len(p_prob) else 0
                                 
-                                # 側邊欄顯示格式：圖示 + 狀態描述
-                                icon_lbl.config(text=f"{WEATHER_ICONS.get(w_code, '')}{WEATHER_CODES.get(w_code, '-')}")
+                                # 側邊欄顯示：分開圖示與文字以確保完美對齊
+                                icon_lbl.config(text=WEATHER_ICONS.get(w_code, ""))
+                                desc_lbl.config(text=WEATHER_CODES.get(w_code, "-"))
                                 temp_lbl.config(text=f"{int(round(w_min))}~{int(round(w_max))}°C")
                                 rain_lbl.config(text=f"☔{w_rain}%")
             except Exception as e:
