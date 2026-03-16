@@ -270,9 +270,10 @@ class TodoApp:
             self.alert_btn.pack_forget()
 
     def _on_alert_click(self, event=None):
-        """點擊預警圖示：打開側邊欄並顯示詳細資訊"""
-        self.sidebar.show_only("投資通知")
-        self.stock_notify_sidebar.update_info(self.current_alerts)
+        """點擊預警圖示：切換側邊欄顯示狀態"""
+        self.sidebar.toggle_widget("投資通知")
+        if self.sidebar.widget_configs.get("投資通知", {}).get("active"):
+            self.stock_notify_sidebar.update_info(self.current_alerts)
 
     def on_closing(self):
 
