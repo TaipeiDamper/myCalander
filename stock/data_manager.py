@@ -34,6 +34,8 @@ class StockDataManager:
         for stock in self.config_data.get("stocks", []):
             if stock.get("symbol") == symbol:
                 stock.update(params)
+                if "alert_long" in stock and "alert_long_up" in params:
+                    del stock["alert_long"]
                 changed = True
                 break
         
@@ -119,18 +121,28 @@ class StockDataManager:
             
             # 優先使用個股設定，若無則用全局預設
             short_th = s_cfg.get('alert_short', global_short)
-            long_th = s_cfg.get('alert_long', global_long)
+            long_up_th = s_cfg.get('alert_long_up', s_cfg.get('alert_long', global_long))
+            long_down_th = s_cfg.get('alert_long_down', s_cfg.get('alert_long', global_long))
             
             # 短線預警：跟昨日收盤比 (prev)
             diff_short_pct = abs((curr - prev) / prev * 100) if prev > 0 else 0
-            # 長線預警：跟參考價基準價比 (ref)
-            diff_long_pct = abs((curr - ref) / ref * 100)
             
-            if diff_long_pct >= long_th:
+            # 長線預警：跟參考價基準價比 (ref)
+            diff_long_up_pct = (curr - ref) / ref * 100 if ref > 0 else 0
+            diff_long_down_pct = (ref - curr) / ref * 100 if ref > 0 else 0
+            
+            if diff_long_up_pct >= long_up_th:
                 alerts.append({
                     "symbol": symbol.split('_')[-1],
-                    "type": "LONG",
-                    "value": diff_long_pct,
+                    "type": "LONG_UP",
+                    "value": diff_long_up_pct,
+                    "price": curr
+                })
+            elif diff_long_down_pct >= long_down_th:
+                alerts.append({
+                    "symbol": symbol.split('_')[-1],
+                    "type": "LONG_DOWN",
+                    "value": diff_long_down_pct,
                     "price": curr
                 })
             elif diff_short_pct >= short_th:

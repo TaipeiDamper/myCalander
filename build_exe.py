@@ -39,8 +39,13 @@ def build():
         for cfg in configs:
             if os.path.exists(cfg):
                 dest_name = os.path.basename(cfg)
-                shutil.copy(cfg, os.path.join("dist", dest_name))
-                print(f"已複製: {cfg} -> dist/{dest_name}")
+                dest_path = os.path.join("dist", dest_name)
+                # 檢查目標路徑是否已經有這個檔案，如果有就不覆蓋
+                if not os.path.exists(dest_path):
+                    shutil.copy(cfg, dest_path)
+                    print(f"已複製: {cfg} -> dist/{dest_name}")
+                else:
+                    print(f"保留現有檔案 (不覆蓋): dist/{dest_name}")
 
         print("\n" + "="*50)
         print("打包完成！")

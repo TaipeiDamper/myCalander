@@ -85,6 +85,7 @@ class TodoApp:
             self.main_container,
             self.todos,
             on_date_click=self._on_date_click,
+            on_edit=self._on_edit_todo,
             external_nav_frame=self.nav_frame
         )
         self.calendar_view.get_frame().pack(fill=tk.BOTH, expand=True)
@@ -111,6 +112,7 @@ class TodoApp:
                 self.main_container,
                 self.todos,
                 on_date_click=self._on_date_click,
+                on_edit=self._on_edit_todo,
                 external_nav_frame=self.nav_frame
             )
             self.calendar_view.get_frame().pack(fill=tk.BOTH, expand=True)

@@ -22,6 +22,7 @@ class CalendarView:
     
     def __init__(self, parent, todos: List[Todo], 
                  on_date_click: Callable[[str], None],
+                 on_edit: Callable[[Todo], None] = None,
                  external_nav_frame: tk.Frame = None):
         """
         初始化月曆視圖
@@ -35,6 +36,7 @@ class CalendarView:
         self.parent = parent
         self.todos = todos
         self.on_date_click = on_date_click
+        self.on_edit = on_edit
         self.external_nav_frame = external_nav_frame
         self.current_date = datetime.now()
         
@@ -369,6 +371,12 @@ class CalendarView:
                 if todo.content:
                     task_text += f" - {todo.content[:30]}"
                 task_listbox.insert(tk.END, task_text)
+                
+            # 綁定點擊事件
+            if self.on_edit:
+                task_listbox.bind("<Double-1>", lambda e: self._on_task_click(e, task_listbox, today_todos_incomplete))
+                # 使用者說「點下去」，保險起見我們也綁定選取事件或其他按鈕，但雙擊是一致的習慣
+                # task_listbox.bind("<<ListboxSelect>>", ...)
         
         # 下半部分：已完成任務
         completed_frame = ttk.LabelFrame(main_container, text="已完成任務", padding=5)
@@ -408,11 +416,23 @@ class CalendarView:
                 if todo.content:
                     task_text += f" - {todo.content[:30]}"
                 task_listbox2.insert(tk.END, task_text)
+                
+            # 綁定點擊事件
+            if self.on_edit:
+                task_listbox2.bind("<Double-1>", lambda e: self._on_task_click(e, task_listbox2, today_todos_completed))
         
         # 設定主容器的行權重
         main_container.rowconfigure(0, weight=1, minsize=60)
         main_container.rowconfigure(1, weight=1, minsize=60)
         main_container.columnconfigure(0, weight=1)
+        
+    def _on_task_click(self, event, listbox, todo_list):
+        """處理列表任務的點擊/雙擊，開啟編輯器"""
+        selection = listbox.curselection()
+        if selection and self.on_edit:
+            idx = selection[0]
+            if idx < len(todo_list):
+                self.on_edit(todo_list[idx])
     
     def update_todos(self, todos: List[Todo]):
         """更新 todo 列表並刷新月曆"""

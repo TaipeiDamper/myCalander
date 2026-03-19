@@ -55,8 +55,14 @@ class StockNotificationSidebar(tk.Frame):
 
         # 顯示警報項目
         for alert in alerts:
-            icon = "🚨" if alert['type'] == "LONG" else "⚠️"
-            text = f"{icon} {alert['symbol']}: 變動 {alert['value']:.1f}% ({alert['price']:.2f})"
+            icon = "🚨" if alert['type'].startswith("LONG") else "⚠️"
+            if alert['type'] == "LONG_UP":
+                direction = "📈 達上限"
+            elif alert['type'] == "LONG_DOWN":
+                direction = "📉 達下限"
+            else:
+                direction = ""
+            text = f"{icon} {alert['symbol']}: {direction} 變動 {alert['value']:.1f}% ({alert['price']:.2f})"
             
             lbl = tk.Label(self.container, text=text, font=("微软雅黑", 9), bg="white", fg="#666666", anchor="w", padx=10, pady=5)
             lbl.pack(fill=tk.X)

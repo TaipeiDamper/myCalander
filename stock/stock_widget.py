@@ -258,7 +258,7 @@ class HiddenStockWidget(tk.Frame):
         dialog.title(f"標的設定: {symbol.split('_')[-1]}")
         
         # 置中於螢幕
-        w, h = 260, 220
+        w, h = 300, 240
         sw = dialog.winfo_screenwidth()
         sh = dialog.winfo_screenheight()
         x = (sw - w) // 2
@@ -285,48 +285,76 @@ class HiddenStockWidget(tk.Frame):
         
         # 長線預警 (vs 基準) - 雙向綁定
         fm2 = tk.Frame(dialog); fm2.pack(padx=10, fill=tk.X)
-        tk.Label(fm2, text="長線目標價/百分比(vs基準):", font=("Arial", 8, "italic")).grid(row=0, column=0, columnspan=2, pady=(0,5))
+        tk.Label(fm2, text="長線目標價上下限/百分比(vs基準):", font=("Arial", 8, "italic")).grid(row=0, column=0, columnspan=4, pady=(0,5))
         
-        tk.Label(fm2, text="目標價格:").grid(row=1, column=0, sticky="e")
-        e_target_p = tk.Entry(fm2, width=12); e_target_p.grid(row=1, column=1)
+        tk.Label(fm2, text="目標上限:").grid(row=1, column=0, sticky="e")
+        e_target_up_p = tk.Entry(fm2, width=8); e_target_up_p.grid(row=1, column=1)
+        tk.Label(fm2, text="%:").grid(row=1, column=2, sticky="e")
+        e_target_up_pct = tk.Entry(fm2, width=6); e_target_up_pct.grid(row=1, column=3)
         
-        tk.Label(fm2, text="變動比例(%):").grid(row=2, column=0, sticky="e")
-        e_target_pct = tk.Entry(fm2, width=12); e_target_pct.grid(row=2, column=1)
+        tk.Label(fm2, text="目標下限:").grid(row=2, column=0, sticky="e")
+        e_target_down_p = tk.Entry(fm2, width=8); e_target_down_p.grid(row=2, column=1)
+        tk.Label(fm2, text="%:").grid(row=2, column=2, sticky="e")
+        e_target_down_pct = tk.Entry(fm2, width=6); e_target_down_pct.grid(row=2, column=3)
         
         # 初始填充長線數值
-        curr_long_th = stock_cfg.get('alert_long', self.data_manager.config_data.get('alert_threshold_long', 15.0))
-        e_target_pct.insert(0, str(curr_long_th))
+        def_long = self.data_manager.config_data.get('alert_threshold_long', 15.0)
+        curr_up_th = stock_cfg.get('alert_long_up', stock_cfg.get('alert_long', def_long))
+        curr_down_th = stock_cfg.get('alert_long_down', stock_cfg.get('alert_long', def_long))
+        
+        e_target_up_pct.insert(0, str(curr_up_th))
+        e_target_down_pct.insert(0, str(curr_down_th))
         try:
-            target_p = current_ref * (1 + curr_long_th/100.0)
-            e_target_p.insert(0, f"{target_p:.2f}")
+            target_up_p = current_ref * (1 + curr_up_th/100.0)
+            e_target_up_p.insert(0, f"{target_up_p:.2f}")
+            target_down_p = current_ref * (1 - curr_down_th/100.0)
+            e_target_down_p.insert(0, f"{target_down_p:.2f}")
         except: pass
 
         def sync_p_to_pct(ev=None):
             try:
                 ref = float(e_ref.get())
-                p = float(e_target_p.get())
-                pct = abs((p - ref) / ref * 100)
-                e_target_pct.delete(0, tk.END); e_target_pct.insert(0, f"{pct:.2f}")
+                p_up = float(e_target_up_p.get())
+                pct_up = (p_up - ref) / ref * 100 if ref > 0 else 0
+                e_target_up_pct.delete(0, tk.END); e_target_up_pct.insert(0, f"{pct_up:.2f}")
+            except: pass
+            try:
+                ref = float(e_ref.get())
+                p_down = float(e_target_down_p.get())
+                pct_down = (ref - p_down) / ref * 100 if ref > 0 else 0
+                e_target_down_pct.delete(0, tk.END); e_target_down_pct.insert(0, f"{pct_down:.2f}")
             except: pass
 
         def sync_pct_to_p(ev=None):
             try:
                 ref = float(e_ref.get())
-                pct = float(e_target_pct.get())
-                p = ref * (1 + pct / 100.0) # 預設顯示正向目標價
-                e_target_p.delete(0, tk.END); e_target_p.insert(0, f"{p:.2f}")
+                pct_up = float(e_target_up_pct.get())
+                p_up = ref * (1 + pct_up / 100.0)
+                e_target_up_p.delete(0, tk.END); e_target_up_p.insert(0, f"{p_up:.2f}")
+            except: pass
+            try:
+                ref = float(e_ref.get())
+                pct_down = float(e_target_down_pct.get())
+                p_down = ref * (1 - pct_down / 100.0)
+                e_target_down_p.delete(0, tk.END); e_target_down_p.insert(0, f"{p_down:.2f}")
             except: pass
 
-        e_target_p.bind("<KeyRelease>", sync_p_to_pct)
-        e_target_pct.bind("<KeyRelease>", sync_pct_to_p)
+        e_target_up_p.bind("<KeyRelease>", sync_p_to_pct)
+        e_target_down_p.bind("<KeyRelease>", sync_p_to_pct)
+        e_target_up_pct.bind("<KeyRelease>", sync_pct_to_p)
+        e_target_down_pct.bind("<KeyRelease>", sync_pct_to_p)
 
         def save():
             try:
                 params = {
                     "reference": float(e_ref.get()),
                     "alert_short": float(e_short.get()) if e_short.get() else 5.0,
-                    "alert_long": float(e_target_pct.get()) if e_target_pct.get() else 15.0
+                    "alert_long_up": float(e_target_up_pct.get()) if e_target_up_pct.get() else 15.0,
+                    "alert_long_down": float(e_target_down_pct.get()) if e_target_down_pct.get() else 15.0
                 }
+                
+                # 若舊參數存在則移除，避免干擾，但因為 save_stock_params 是 update 所以可能會保留
+                # 我們可以藉由回傳 params 更新 data，但沒法輕鬆刪除 key。
                 if self.data_manager.save_stock_params(symbol, params):
                     self._build_ui(); self.refresh_prices(); dialog.destroy()
             except Exception as e:

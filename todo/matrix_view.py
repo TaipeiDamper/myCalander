@@ -32,16 +32,17 @@ class MatrixView:
         self.top_frame = ttk.Frame(self.paned)
         self.paned.add(self.top_frame, minsize=150)
         
-        for i in range(4):
+        for i in range(5):
             self.top_frame.columnconfigure(i, weight=1, uniform="list_col")
         self.top_frame.rowconfigure(0, weight=1)
         
         self.listboxes = {}
         lists_info = [
+            ("overdue", "已逾期"),
             ("today", "今天到期"),
+            ("today_completed", "今日完成 (更動)"),
             ("week", "這周到期"),
-            ("all_incomplete", "所有未完成"),
-            ("today_completed", "今日完成 (更動)")
+            ("all_incomplete", "所有未完成")
         ]
         
         for idx, (key, title) in enumerate(lists_info):
@@ -58,6 +59,12 @@ class MatrixView:
             
             lb.bind("<<ListboxSelect>>", lambda e, k=key: self._on_listbox_select(k))
             lb.bind("<Double-1>", lambda e, k=key: self._on_listbox_double_click(k))
+            
+            # 拖曳事件綁定
+            lb.bind("<ButtonPress-1>", lambda e, k=key, box=lb: self._on_drag_start(e, k, box), add="+")
+            lb.bind("<B1-Motion>", self._on_drag_motion)
+            lb.bind("<ButtonRelease-1>", self._on_drag_release)
+            
             self.listboxes[key] = lb
             
         # --- 下半部：艾森豪矩陣 ---
@@ -105,7 +112,7 @@ class MatrixView:
         for lb in self.listboxes.values():
             lb.delete(0, tk.END)
             
-        self.list_data = {"today": [], "week": [], "all_incomplete": [], "today_completed": []}
+        self.list_data = {"overdue": [], "today": [], "week": [], "all_incomplete": [], "today_completed": []}
         
         now = datetime.now()
         now_date = now.date()
@@ -125,6 +132,7 @@ class MatrixView:
             try:
                 t_date = datetime.strptime(t.date, "%Y-%m-%d").date()
                 days_diff = (t_date - now_date).days
+                if days_diff < 0: self.list_data["overdue"].append(t)
                 if days_diff == 0: self.list_data["today"].append(t)
                 if 0 <= days_diff <= 7: self.list_data["week"].append(t)
             except ValueError: pass
@@ -167,6 +175,69 @@ class MatrixView:
             idx = selection[0]
             selected_t = self.list_data[source_key][idx]
             self.on_edit(selected_t)
+            
+    def _on_drag_start(self, event, key, lb):
+        idx = lb.nearest(event.y)
+        if idx >= 0:
+            bbox = lb.bbox(idx)
+            if bbox and bbox[1] <= event.y <= bbox[1] + bbox[3] and idx < len(self.list_data[key]):
+                self.drag_data = {
+                    "item": self.list_data[key][idx],
+                    "source_key": key,
+                    "widget": lb,
+                    "y": event.y
+                }
+                return
+        self.drag_data = None
+
+    def _on_drag_motion(self, event):
+        if getattr(self, 'drag_data', None):
+            self.parent.config(cursor="fleur")
+
+    def _on_drag_release(self, event):
+        self.parent.config(cursor="")
+        if getattr(self, 'drag_data', None):
+            # 取回座標來判斷丟在哪個元件上
+            x_root = event.widget.winfo_rootx() + event.x
+            y_root = event.widget.winfo_rooty() + event.y
+            
+            target_widget = event.widget.winfo_containing(x_root, y_root)
+            
+            target_key = None
+            for k, lb in self.listboxes.items():
+                if target_widget == lb:
+                    target_key = k
+                    break
+                    
+            if target_key:
+                source_key = self.drag_data["source_key"]
+                todo = self.drag_data["item"]
+                
+                allowed = False
+                # 允許在狀態與日期之間切換拖曳
+                if target_key == "today_completed" and source_key in ["today", "overdue"]:
+                    todo.completed = True
+                    allowed = True
+                elif target_key == "today" and source_key == "today_completed":
+                    # 拖回「今天到期」代表重新安排在今天
+                    todo.completed = False
+                    todo.date = datetime.now().strftime("%Y-%m-%d")
+                    allowed = True
+                elif target_key in ["overdue", "all_incomplete"] and source_key == "today_completed":
+                    # 拖回「已逾期」或「未完成」代表退回原本未完成狀態（保留原日期）
+                    todo.completed = False
+                    allowed = True
+                elif target_key == "today" and source_key == "overdue":
+                    # 從已逾期拖到今天到期（延期）
+                    todo.completed = False
+                    todo.date = datetime.now().strftime("%Y-%m-%d")
+                    allowed = True
+                    
+                if allowed:
+                    if self.on_toggle_complete:
+                        self.on_toggle_complete(todo)
+                        
+            self.drag_data = None
             
     def _on_canvas_click(self, todo_id, event=None):
         # 如果點擊的是已經選中的，我們嘗試找尋重疊的下一個
