@@ -7,9 +7,10 @@ CONFIG_FILE = "stock_config.json"
 
 class StockStyle:
     """集中管理 UI 配色與樣式"""
-    PRIMARY_GREY = "#d0d0d0"
-    HOVER_GREY = "#888888"
-    BAR_TRACK = "#e0e0e0"
+    PRIMARY_GREY = "#c4c4c4"    # 調整至 0.4 位置，極致柔和
+    HOVER_GREY = "#999999"      # 懸停時略微加深
+    HOVER_BG = "#f8f8f8"
+    BAR_TRACK = "#eeeeee"
     BAR_GUIDE = "#d0d0d0"
     TEXT_POPUP = "#444444"
     FONT_MAIN = ("Arial", 9)
@@ -34,7 +35,9 @@ class HiddenStockWidget(tk.Frame):
         self.update_interval_ms = self.data_manager.config_data.get("update_interval_seconds", 30) * 1000
         
         self._build_ui()
-        self.refresh_prices()
+        # 強制刷新 UI 佈局後再啟動數據更新，確保第一次加載就能正常秀位
+        self.update()
+        self.after(500, self.refresh_prices)
         
     def _get_config_path(self):
         import sys
@@ -68,55 +71,115 @@ class HiddenStockWidget(tk.Frame):
 
     def _build_expanded_ui(self, bg):
         stocks = self.data_manager.config_data.get("stocks", [])
+        max_visible = 4 # 最大顯示數量調降為 4，節省空間且避開日期
+        item_height = 28 # 每列概估高度
+        
+        # 建立外層容器以區分布局：清單區 (捲動) 與 控制區 (固定)
+        self.columnconfigure(0, weight=1)
+        
+        # 1. 捲動清單區
+        list_container = tk.Frame(self, bg=bg)
+        list_container.grid(row=0, column=0, sticky="nsew")
+        
+        # 計算畫布高度
+        display_count = min(len(stocks), max_visible)
+        canvas_h = display_count * item_height
+        
+        self.canvas = tk.Canvas(list_container, height=canvas_h, bg=bg, highlightthickness=0)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 內部框架放置股票資料
+        self.scroll_frame = tk.Frame(self.canvas, bg=bg)
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        
+        # 綁定捲動事件
+        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
         for i, stock in enumerate(stocks):
             symbol = stock.get("symbol", "")
             ref = stock.get("reference", "-")
             display_sym = symbol.split('_')[-1]
             
-            # 標記
-            sym_lbl = tk.Label(self, text=display_sym, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
-            sym_lbl.grid(row=i, column=0, padx=2, pady=2, sticky="e")
+            # 建立單列容器
+            row_fm = tk.Frame(self.scroll_frame, bg=bg)
+            row_fm.pack(fill=tk.X, pady=1)
+            
+            # 實作整列懸停變色效果
+            def on_enter(e, f=row_fm): 
+                f.config(bg=StockStyle.HOVER_BG)
+                for child in f.winfo_children():
+                    if isinstance(child, tk.Label): child.config(bg=StockStyle.HOVER_BG)
+                    if isinstance(child, tk.Canvas): child.config(bg=StockStyle.HOVER_BG)
+
+            def on_leave(e, f=row_fm):
+                f.config(bg=bg)
+                for child in f.winfo_children():
+                    if isinstance(child, tk.Label): child.config(bg=bg)
+                    if isinstance(child, tk.Canvas): child.config(bg=bg)
+
+            row_fm.bind("<Enter>", on_enter)
+            row_fm.bind("<Leave>", on_leave)
+
+            # 標記 (使用 grid 以維持對齊)
+            row_fm.columnconfigure(4, weight=1) # 讓圖表區有伸縮性
+            
+            sym_lbl = tk.Label(row_fm, text=display_sym, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2", width=6, anchor="e")
+            sym_lbl.grid(row=0, column=0, padx=2)
             sym_lbl.bind("<Button-1>", lambda e, s=symbol, r=ref, cfg=stock: self._show_edit_dialog(e, s, r, cfg))
-            self._add_hover(sym_lbl)
+            # 讓 Label 也觸發整列變色並改變自身文字顏色
+            sym_lbl.bind("<Enter>", lambda e, w=sym_lbl: (on_enter(e), w.config(fg=StockStyle.HOVER_GREY)))
+            sym_lbl.bind("<Leave>", lambda e, w=sym_lbl: (on_leave(e), w.config(fg=StockStyle.PRIMARY_GREY)))
             
-            ref_lbl = tk.Label(self, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
-            ref_lbl.grid(row=i, column=1, padx=4, sticky="e")
+            ref_lbl = tk.Label(row_fm, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            ref_lbl.grid(row=0, column=1, padx=4)
 
+            prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            prev_lbl.grid(row=0, column=2, padx=4)
+            
+            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            curr_lbl.grid(row=0, column=3, padx=4)
+            
+            canvas_bar = tk.Canvas(row_fm, width=80, height=24, bg=bg, highlightthickness=0, cursor="hand2")
+            canvas_bar.grid(row=0, column=4, padx=5)
+            canvas_bar.bind("<Button-1>", lambda e, c=canvas_bar: self._on_bar_click(e, c))
+            canvas_bar.bind("<Leave>", lambda e, c=canvas_bar: self._hide_temp_val(c))
+            
+            diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w")
+            diff_lbl.grid(row=0, column=5, padx=2)
+            
+            self.labels[symbol] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
 
-            
-            prev_lbl = tk.Label(self, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
-            prev_lbl.grid(row=i, column=2, padx=4, sticky="e")
-            
-            curr_lbl = tk.Label(self, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg)
-            curr_lbl.grid(row=i, column=3, padx=4, sticky="e")
-            
-            canvas = tk.Canvas(self, width=80, height=24, bg=bg, highlightthickness=0, cursor="hand2")
-            canvas.grid(row=i, column=4, padx=5, sticky="w")
-            canvas.bind("<Button-1>", lambda e, c=canvas: self._on_bar_click(e, c))
-            canvas.bind("<Leave>", lambda e, c=canvas: self._hide_temp_val(c))
-            
-            diff_lbl = tk.Label(self, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, justify="left")
-            diff_lbl.grid(row=i, column=5, padx=2, sticky="w")
-            
-            self.labels[symbol] = (prev_lbl, curr_lbl, canvas, diff_lbl)
+        # 2. 固定控制區 (放在 Grid 的下一列)
+        ctrl_container = tk.Frame(self, bg=bg)
+        ctrl_container.grid(row=1, column=0, sticky="ew")
+        self._build_control_btns(ctrl_container, bg)
 
-        # 底部控制鈕
-        btn_row = len(stocks)
-        self._build_control_btns(btn_row, bg)
+    def _on_mousewheel(self, event):
+        """處理滑鼠捲動，僅當滑鼠在小工具上方時觸發"""
+        # 檢查滑鼠是否在小工具範圍內
+        x, y = self.winfo_pointerxy()
+        widget = self.winfo_containing(x, y)
+        
+        # 如果當前 widget 是本體或其子元件
+        if widget and (str(widget).startswith(str(self))):
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-    def _build_control_btns(self, row, bg):
+    def _build_control_btns(self, container, bg):
         items = [
-            ("⚙️", 1, "w", self._show_global_config_dialog),
-            ("×", 4, "e", self.toggle_collapse),
-            ("↻", 5, "w", self.manual_update)
+            ("⚙️", 0, "w", self._show_global_config_dialog),
+            ("×", 3, "e", self.toggle_collapse),
+            ("↻", 4, "w", self.manual_update)
         ]
 
         if self.on_notify_toggle:
-            items.append(("🔔", 3, "e", lambda: self.on_notify_toggle()))
+            items.append(("🔔", 2, "e", lambda: self.on_notify_toggle()))
 
+        container.columnconfigure(1, weight=1) # 中間留白
+        
         for text, col, stick, cmd in items:
-            btn = tk.Label(self, text=text, font=("Arial", 10), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
-            btn.grid(row=row, column=col, padx=5, pady=2, sticky=stick)
+            btn = tk.Label(container, text=text, font=("Arial", 10), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
+            btn.grid(row=0, column=col, padx=8, pady=2, sticky=stick)
             btn.bind("<Button-1>", lambda e, c=cmd: c())
             self._add_hover(btn)
 
@@ -141,6 +204,11 @@ class HiddenStockWidget(tk.Frame):
         if self._update_job: self.after_cancel(self._update_job)
         # 每次刷新前重新讀取設定，確保手動修改 JSON 也能即時反應
         self.data_manager.config_data = self.data_manager.load_config()
+        
+        # 更新畫布內的 window 寬度以適應容器
+        if hasattr(self, "canvas") and hasattr(self, "scroll_frame") and self.winfo_exists():
+            self.canvas.itemconfig(self.canvas_window, width=self.canvas.winfo_width())
+            
         self.data_manager.fetch_prices(self._on_fetch_done)
 
     def _on_fetch_done(self, result):
