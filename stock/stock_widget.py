@@ -34,6 +34,9 @@ class HiddenStockWidget(tk.Frame):
         self.data_manager = StockDataManager(self._get_config_path())
         self.update_interval_ms = self.data_manager.config_data.get("update_interval_seconds", 30) * 1000
         
+        # 綁定全域滾輪事件 (僅綁定一次)
+        self.bind_all("<MouseWheel>", self._on_mousewheel)
+        
         self._build_ui()
         # 強制刷新 UI 佈局後再啟動數據更新，確保第一次加載就能正常秀位
         self.update()
@@ -62,7 +65,8 @@ class HiddenStockWidget(tk.Frame):
         else:
             self._build_expanded_ui(bg_col)
         
-        self.bind("<Button-1>", self.manual_update)
+        # 使用 lambda 與 return "break" 確保事件不會冒泡到父層
+        self.bind("<Button-1>", lambda e: self.manual_update(e))
 
     def _build_collapsed_ui(self, bg):
         lbl = tk.Label(self, text="·", font=("Arial", 10, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
@@ -100,7 +104,6 @@ class HiddenStockWidget(tk.Frame):
         
         # 綁定捲動事件
         self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
         for i, stock in enumerate(stocks):
             symbol = stock.get("symbol", "")
@@ -167,9 +170,12 @@ class HiddenStockWidget(tk.Frame):
         x, y = self.winfo_pointerxy()
         widget = self.winfo_containing(x, y)
         
-        # 如果當前 widget 是本體或其子元件
-        if widget and (str(widget).startswith(str(self))):
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        # 如果當前 widget 是本體或其子元件，且 Canvas 存在
+        if widget and (str(widget).startswith(str(self))) and hasattr(self, "canvas") and self.canvas.winfo_exists():
+            try:
+                self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            except:
+                pass
 
     def _build_control_btns(self, container, bg):
         items = [
@@ -186,7 +192,7 @@ class HiddenStockWidget(tk.Frame):
         for text, col, stick, cmd in items:
             btn = tk.Label(container, text=text, font=("Arial", 10), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
             btn.grid(row=0, column=col, padx=8, pady=2, sticky=stick)
-            btn.bind("<Button-1>", lambda e, c=cmd: c())
+            btn.bind("<Button-1>", lambda e, c=cmd: (c(), "break")[1])
             self._add_hover(btn)
 
     def _add_hover(self, widget):
@@ -194,24 +200,37 @@ class HiddenStockWidget(tk.Frame):
         widget.bind("<Leave>", lambda e: widget.config(fg=StockStyle.PRIMARY_GREY))
 
     def manual_update(self, event=None):
-        # 檢查設定是否有變動 (比對長度或內容)
+        """強助手動刷新：重新載入設定、重建 UI、並立即抓取數據"""
+        # 1. 重新讀取設定與週期
         self.data_manager.config_data = self.data_manager.load_config()
-        self._build_ui() # 直接重建 UI 以確保新加入的股票能顯示標籤
+        self.update_interval_ms = self.data_manager.config_data.get("update_interval_seconds", 30) * 1000
+        
+        # 2. 重建 UI
+        self._build_ui()
+        self.update_idletasks() # 強制同步 UI 尺寸以便後續計算
             
-        for _, curr, canvas, _ in self.labels.values():
-            if curr.winfo_exists():
-                curr.config(text="...")
+        # 3. 初始狀態回饋
+        for sym in self.labels:
+            _, lbl_curr, canvas, _ = self.labels[sym]
+            if lbl_curr.winfo_exists():
+                lbl_curr.config(text="..." )
                 canvas.delete("all")
+        
+        # 4. 執行數據更新
         self.refresh_prices()
+        return "break"
 
     def refresh_prices(self):
-        if self._update_job: self.after_cancel(self._update_job)
-        # 每次刷新前重新讀取設定，確保手動修改 JSON 也能即時反應
-        self.data_manager.config_data = self.data_manager.load_config()
+        if not self.winfo_exists(): return
+        if self._update_job: 
+            self.after_cancel(self._update_job)
+            self._update_job = None
         
-        # 更新畫布內的 window 寬度以適應容器
-        if hasattr(self, "canvas") and hasattr(self, "scroll_frame") and self.winfo_exists():
-            self.canvas.itemconfig(self.canvas_window, width=self.canvas.winfo_width())
+        # 更新畫布內的 window 寬度 (增加 winfo_width > 1 判斷)
+        if hasattr(self, "canvas") and self.canvas.winfo_exists() and hasattr(self, "scroll_frame") and self.scroll_frame.winfo_exists():
+            w = self.canvas.winfo_width()
+            if w > 1:
+                self.canvas.itemconfig(self.canvas_window, width=w)
             
         self.data_manager.fetch_prices(self._on_fetch_done)
 
@@ -220,33 +239,42 @@ class HiddenStockWidget(tk.Frame):
         self.after(0, lambda: self._do_apply_updates(result))
 
     def _do_apply_updates(self, result):
-        if self.is_collapsed or not result: return
+        if not self.winfo_exists(): return
         
-        updates = result.get("updates", {})
-        alerts = result.get("alerts", [])
-        
-        for sym, (prev, curr, high, low, hint) in updates.items():
+        # 二次嘗試校正寬度，確保數據填入時布局是正確的
+        if hasattr(self, "canvas") and self.canvas.winfo_exists():
+            w = self.canvas.winfo_width()
+            if w > 1:
+                self.canvas.itemconfig(self.canvas_window, width=w)
 
-            if sym not in self.labels: continue
-            lbl_prev, lbl_curr, canvas, lbl_diff = self.labels[sym]
-            if not lbl_curr.winfo_exists(): continue
-
-            # 更新文字
-            lbl_prev.config(text=f"{prev:.2f}")
-            lbl_curr.config(text=f"{curr:.{hint}f}")
-            diff_pct = (curr - prev) / prev * 100 if prev > 0 else 0
-            lbl_diff.config(text=f"{diff_pct:+.2f}%")
-
-            # 繪製圖形
-            self._draw_status_bar(canvas, prev, curr, high, low)
+        # 哪怕 fetch 失敗或是處於縮小狀態，也要排程下一次更新，否則功能會「失去」
+        if result and not self.is_collapsed:
+            updates = result.get("updates", {})
+            alerts = result.get("alerts", [])
             
-        # 處理警報 (即使 alerts 為空也要傳送，用來清除 UI 警示圖示)
-        if self.on_alert is not None:
-            self.on_alert(alerts)
+            for sym, data in updates.items():
+                if sym not in self.labels: continue
+                # 注意：data 格式為 (prev, curr, high, low, hint)
+                prev, curr, high, low, hint = data
+                lbl_prev, lbl_curr, canvas, lbl_diff = self.labels[sym]
+                if not lbl_curr.winfo_exists(): continue
 
+                # 更新文字
+                lbl_prev.config(text=f"{prev:.2f}")
+                lbl_curr.config(text=f"{curr:.{hint}f}")
+                diff_pct = (curr - prev) / prev * 100 if prev > 0 else 0
+                lbl_diff.config(text=f"{diff_pct:+.2f}%")
+
+                # 繪製圖形
+                self._draw_status_bar(canvas, prev, curr, high, low)
             
-        # 循環更新
+            # 處理警報
+            if self.on_alert is not None:
+                self.on_alert(alerts)
 
+        # 循環更新排程 (確保永遠持續)
+        if self._update_job:
+            self.after_cancel(self._update_job)
         self._update_job = self.after(self.update_interval_ms, self.refresh_prices)
 
     def _draw_status_bar(self, canvas, prev, curr, high, low):
