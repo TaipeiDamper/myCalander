@@ -40,12 +40,14 @@ def build():
             if os.path.exists(cfg):
                 dest_name = os.path.basename(cfg)
                 dest_path = os.path.join("dist", dest_name)
-                # 檢查目標路徑是否已經有這個檔案，如果有就不覆蓋
-                if not os.path.exists(dest_path):
+                # 邏輯調整：todos.json 保留使用者資料，其餘設定檔則強制覆蓋更新
+                is_config = "config" in dest_name
+                if not os.path.exists(dest_path) or is_config:
                     shutil.copy(cfg, dest_path)
-                    print(f"已複製: {cfg} -> dist/{dest_name}")
+                    action = "覆蓋更新" if os.path.exists(dest_path) and is_config else "已複製"
+                    print(f"{action}: {cfg} -> dist/{dest_name}")
                 else:
-                    print(f"保留現有檔案 (不覆蓋): dist/{dest_name}")
+                    print(f"保留現有使用者資料 (不覆蓋): dist/{dest_name}")
 
         print("\n" + "="*50)
         print("打包完成！")

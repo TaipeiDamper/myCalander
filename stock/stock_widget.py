@@ -71,7 +71,7 @@ class HiddenStockWidget(tk.Frame):
 
     def _build_expanded_ui(self, bg):
         stocks = self.data_manager.config_data.get("stocks", [])
-        max_visible = 4 # 最大顯示數量調降為 4，節省空間且避開日期
+        max_visible = 4 # 回復為 4 檔以節省空間，搭配捲軸查看更多項目
         item_height = 28 # 每列概估高度
         
         # 建立外層容器以區分布局：清單區 (捲動) 與 控制區 (固定)
@@ -87,6 +87,12 @@ class HiddenStockWidget(tk.Frame):
         
         self.canvas = tk.Canvas(list_container, height=canvas_h, bg=bg, highlightthickness=0)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 建立捲軸 (當股票數量超過顯示上限時)
+        if len(stocks) > max_visible:
+            sb = tk.Scrollbar(list_container, orient="vertical", command=self.canvas.yview, width=8)
+            sb.pack(side=tk.RIGHT, fill=tk.Y)
+            self.canvas.configure(yscrollcommand=sb.set)
         
         # 內部框架放置股票資料
         self.scroll_frame = tk.Frame(self.canvas, bg=bg)
@@ -188,11 +194,9 @@ class HiddenStockWidget(tk.Frame):
         widget.bind("<Leave>", lambda e: widget.config(fg=StockStyle.PRIMARY_GREY))
 
     def manual_update(self, event=None):
-        # 檢查設定是否有變動
-        old_config = self.data_manager.config_data.copy()
+        # 檢查設定是否有變動 (比對長度或內容)
         self.data_manager.config_data = self.data_manager.load_config()
-        if self.data_manager.config_data != old_config:
-            self._build_ui()
+        self._build_ui() # 直接重建 UI 以確保新加入的股票能顯示標籤
             
         for _, curr, canvas, _ in self.labels.values():
             if curr.winfo_exists():
