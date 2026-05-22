@@ -24,6 +24,10 @@ class HiddenStockWidget(tk.Frame):
         self.on_alert = on_alert
 
         self.labels = {}
+        self.detail_frames = {}
+        self.detail_labels = {}
+        self.highlighted_keys = {}
+        self.expanded_symbols = set()
         self._update_job = None
         self.is_collapsed = False
         self.active_dialog = None  # 紀錄當前開啟的對話視窗
@@ -56,6 +60,8 @@ class HiddenStockWidget(tk.Frame):
     def _build_ui(self):
         for w in self.winfo_children(): w.destroy()
         self.labels.clear()
+        self.detail_frames.clear()
+        self.detail_labels.clear()
         
         bg_col = self.master.cget("bg")
         self.config(bg=bg_col)
@@ -105,30 +111,66 @@ class HiddenStockWidget(tk.Frame):
         # 綁定捲動事件
         self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
+        def set_item_bg(item_fm, row_fm, detail_fm, symbol, color):
+            item_fm.config(bg=color)
+            row_fm.config(bg=color)
+            for child in row_fm.winfo_children():
+                if isinstance(child, (tk.Label, tk.Canvas)):
+                    child.config(bg=color)
+            detail_fm.config(bg=color)
+            for child in detail_fm.winfo_children():
+                if isinstance(child, tk.Label):
+                    lbl_key = getattr(child, "indicator_key", None)
+                    is_hl = (self.highlighted_keys.get(symbol) == lbl_key) if lbl_key else False
+                    if is_hl:
+                        child.config(bg="#e5e5e5", fg="#000000")
+                    else:
+                        child.config(bg=color, fg=StockStyle.PRIMARY_GREY)
+
         for i, stock in enumerate(stocks):
             symbol = stock.get("symbol", "")
             ref = stock.get("reference", "-")
             display_sym = symbol.split('_')[-1]
             
             # 建立單列容器
-            row_fm = tk.Frame(self.scroll_frame, bg=bg)
-            row_fm.pack(fill=tk.X, pady=1)
+            item_fm = tk.Frame(self.scroll_frame, bg=bg)
+            item_fm.pack(fill=tk.X, pady=1)
             
-            # 實作整列懸停變色效果
-            def on_enter(e, f=row_fm): 
-                f.config(bg=StockStyle.HOVER_BG)
-                for child in f.winfo_children():
-                    if isinstance(child, tk.Label): child.config(bg=StockStyle.HOVER_BG)
-                    if isinstance(child, tk.Canvas): child.config(bg=StockStyle.HOVER_BG)
+            row_fm = tk.Frame(item_fm, bg=bg)
+            row_fm.pack(fill=tk.X, expand=True)
+            
+            detail_fm = tk.Frame(item_fm, bg=bg)
+            self.detail_frames[symbol] = detail_fm
+            
+            def make_hover_handlers(i_fm=item_fm, r_fm=row_fm, d_fm=detail_fm, sym=symbol):
+                def on_enter(e):
+                    set_item_bg(i_fm, r_fm, d_fm, sym, StockStyle.HOVER_BG)
+                
+                def on_leave(e):
+                    x, y = self.winfo_pointerxy()
+                    containing = self.winfo_containing(x, y)
+                    if containing:
+                        p = containing
+                        is_inside = False
+                        while p:
+                            if p == i_fm:
+                                is_inside = True
+                                break
+                            p = p.master
+                        if is_inside:
+                            return
+                    set_item_bg(i_fm, r_fm, d_fm, sym, bg)
+                    self._clear_highlights(sym)
+                return on_enter, on_leave
 
-            def on_leave(e, f=row_fm):
-                f.config(bg=bg)
-                for child in f.winfo_children():
-                    if isinstance(child, tk.Label): child.config(bg=bg)
-                    if isinstance(child, tk.Canvas): child.config(bg=bg)
-
+            on_enter, on_leave = make_hover_handlers()
+            
+            item_fm.bind("<Enter>", on_enter)
+            item_fm.bind("<Leave>", on_leave)
             row_fm.bind("<Enter>", on_enter)
             row_fm.bind("<Leave>", on_leave)
+            detail_fm.bind("<Enter>", on_enter)
+            detail_fm.bind("<Leave>", on_leave)
 
             # 標記 (使用 grid 以維持對齊)
             row_fm.columnconfigure(4, weight=1) # 讓圖表區有伸縮性
@@ -136,9 +178,6 @@ class HiddenStockWidget(tk.Frame):
             sym_lbl = tk.Label(row_fm, text=display_sym, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2", width=6, anchor="e")
             sym_lbl.grid(row=0, column=0, padx=2)
             sym_lbl.bind("<Button-1>", lambda e, s=symbol, r=ref, cfg=stock: self._show_edit_dialog(e, s, r, cfg))
-            # 讓 Label 也觸發整列變色並改變自身文字顏色
-            sym_lbl.bind("<Enter>", lambda e, w=sym_lbl: (on_enter(e), w.config(fg=StockStyle.HOVER_GREY)))
-            sym_lbl.bind("<Leave>", lambda e, w=sym_lbl: (on_leave(e), w.config(fg=StockStyle.PRIMARY_GREY)))
             
             ref_lbl = tk.Label(row_fm, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
             ref_lbl.grid(row=0, column=1, padx=4)
@@ -146,8 +185,9 @@ class HiddenStockWidget(tk.Frame):
             prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
             prev_lbl.grid(row=0, column=2, padx=4)
             
-            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
             curr_lbl.grid(row=0, column=3, padx=4)
+            curr_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
             
             canvas_bar = tk.Canvas(row_fm, width=80, height=24, bg=bg, highlightthickness=0, cursor="hand2")
             canvas_bar.grid(row=0, column=4, padx=5)
@@ -157,7 +197,21 @@ class HiddenStockWidget(tk.Frame):
             diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w")
             diff_lbl.grid(row=0, column=5, padx=2)
             
+            # 綁定子元件 hover 事件
+            for child in row_fm.winfo_children():
+                if child == sym_lbl:
+                    child.bind("<Enter>", lambda e, w=sym_lbl: (on_enter(e), w.config(fg=StockStyle.HOVER_GREY)))
+                    child.bind("<Leave>", lambda e, w=sym_lbl: (on_leave(e), w.config(fg=StockStyle.PRIMARY_GREY)))
+                else:
+                    child.bind("<Enter>", on_enter)
+                    child.bind("<Leave>", on_leave)
+            
             self.labels[symbol] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
+            
+            # 如果原本是展開的，維持展開
+            if symbol in self.expanded_symbols:
+                detail_fm.pack(fill=tk.X)
+                self._render_detail_content(symbol)
 
         # 2. 固定控制區 (放在 Grid 的下一列)
         ctrl_container = tk.Frame(self, bg=bg)
@@ -266,7 +320,11 @@ class HiddenStockWidget(tk.Frame):
                 lbl_diff.config(text=f"{diff_pct:+.2f}%")
 
                 # 繪製圖形
-                self._draw_status_bar(canvas, prev, curr, high, low)
+                self._draw_status_bar(canvas, prev, curr, high, low, sym)
+                
+                # 若處於展開狀態，一併刷新詳細數值列
+                if sym in self.expanded_symbols:
+                    self._render_detail_content(sym)
             
             # 處理警報
             if self.on_alert is not None:
@@ -277,12 +335,23 @@ class HiddenStockWidget(tk.Frame):
             self.after_cancel(self._update_job)
         self._update_job = self.after(self.update_interval_ms, self.refresh_prices)
 
-    def _draw_status_bar(self, canvas, prev, curr, high, low):
+    def _draw_status_bar(self, canvas, prev, curr, high, low, symbol):
         canvas.delete("all")
         w, h = int(canvas.cget("width")), int(canvas.cget("height"))
         
-        # 置中計算
-        v_low, v_high = min(low, prev), max(high, prev)
+        # 獲取 computed 數據
+        computed = self.data_manager.computed_assets.get(symbol)
+        ma20 = computed.get("ma20") if computed else None
+        nav = computed.get("nav") if (computed and computed.get("type") == "etf") else None
+        strong_buy = computed.get("strongBuyPrice") if computed else None
+        
+        # 收集所有有值的價格
+        all_vals = [prev, curr, high, low]
+        if ma20 is not None: all_vals.append(ma20)
+        if nav is not None: all_vals.append(nav)
+        if strong_buy is not None: all_vals.append(strong_buy)
+        
+        v_low, v_high = min(all_vals), max(all_vals)
         v_range = v_high - v_low
         v_range_pct = (v_range / prev * 100.0) if prev > 0 else 0
         
@@ -295,52 +364,129 @@ class HiddenStockWidget(tk.Frame):
             return start_x + (v - v_low) / (v_high - v_low) * uw if v_high > v_low else w/2
 
         xl, xh, xp, xc = get_x(low), get_x(high), get_x(prev), get_x(curr)
-        canvas.stock_coords = {'low': low, 'high': high, 'x_low': xl, 'x_high': xh}
+        
+        canvas.stock_coords = []
+        canvas.stock_symbol = symbol
 
         # 軌道
         canvas.create_line(xl, h/2, xh, h/2, fill=StockStyle.BAR_TRACK, width=4, capstyle=tk.ROUND)
         # 端點
         for x in (xl, xh): canvas.create_oval(x-2, h/2-2, x+2, h/2+2, fill="#eeeeee", outline="")
-        # 昨收線：改為寬度 1 並使用虛線，減少視覺重量
+        # 昨收線
         canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.BAR_GUIDE, width=1, dash=(2, 2))
         
-        # 指示器：縮小尺寸並加入淺色填充，改善重疊感
+        # 指示器
         if curr != prev:
-            # 寬度從 9 改為 7, 高度從 10 改為 8
             points = [xc+4, h/2, xc-3, h/2-4, xc-3, h/2+4] if curr > prev else [xc-4, h/2, xc+3, h/2-4, xc+3, h/2+4]
             canvas.create_polygon(points, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
         else:
             canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
+            
+        # 繪製有值的指標垂直短線刻度，並記錄在 stock_coords 中
+        indicator_draws = [
+            ("ma20", ma20),
+            ("nav", nav),
+            ("strongBuyPrice", strong_buy)
+        ]
+        for key, val in indicator_draws:
+            if val is not None:
+                x = get_x(val)
+                canvas.create_line(x, h/2 - 6, x, h/2 + 6, fill=StockStyle.PRIMARY_GREY, width=2)
+                canvas.stock_coords.append({
+                    "key": key,
+                    "val": val,
+                    "x": x
+                })
 
     def _on_bar_click(self, event, canvas):
-        if hasattr(canvas, "stock_coords"):
-            coords = canvas.stock_coords
-            # 改為判斷距離點擊位置最近的座標 (L 或 H)
-            dist_l = abs(event.x - coords['x_low'])
-            dist_h = abs(event.x - coords['x_high'])
+        if hasattr(canvas, "stock_coords") and canvas.stock_coords:
+            valid_coords = [c for c in canvas.stock_coords if c.get('key')]
+            if not valid_coords: return
             
-            if dist_l < dist_h:
-                self._show_temp_val(canvas, f"L:{coords['low']:.2f}", coords['x_low'])
-            else:
-                self._show_temp_val(canvas, f"H:{coords['high']:.2f}", coords['x_high'])
-            return
-
-    def _show_temp_val(self, canvas, text, x):
-        self._hide_temp_val(canvas) # 先清除舊的
-        
-        # 顯示數值，座標上移一點預留間距
-        canvas.create_text(x, 6, text=text, fill=StockStyle.TEXT_POPUP, font=StockStyle.FONT_BOLD, tags="temp_val")
-        
-        # 設定自動消失計時器
-        timer_id = self.after(3000, lambda: self._hide_temp_val(canvas))
-        canvas.hide_timer = timer_id
+            closest = min(valid_coords, key=lambda c: abs(event.x - c['x']))
+            symbol = getattr(canvas, "stock_symbol", None)
+            if symbol:
+                self._highlight_detail_label(symbol, closest['key'])
 
     def _hide_temp_val(self, canvas):
-        """隱藏暫時顯示的數值並取消計時器"""
-        canvas.delete("temp_val")
-        if hasattr(canvas, "hide_timer") and canvas.hide_timer:
-            self.after_cancel(canvas.hide_timer)
-            canvas.hide_timer = None
+        pass
+
+    def _highlight_detail_label(self, symbol, key):
+        self._clear_highlights(symbol)
+        
+        self.highlighted_keys[symbol] = key
+        
+        labels_map = self.detail_labels.get(symbol, {})
+        lbl = labels_map.get(key)
+        if lbl and lbl.winfo_exists():
+            lbl.config(bg="#e5e5e5", fg="#000000")
+
+    def _clear_highlights(self, symbol):
+        if symbol in self.highlighted_keys:
+            del self.highlighted_keys[symbol]
+        
+        labels_map = self.detail_labels.get(symbol, {})
+        detail_fm = self.detail_frames.get(symbol)
+        bg_color = detail_fm.cget("bg") if (detail_fm and detail_fm.winfo_exists()) else self.master.cget("bg")
+        
+        for key, lbl in labels_map.items():
+            if lbl and lbl.winfo_exists():
+                lbl.config(bg=bg_color, fg=StockStyle.PRIMARY_GREY)
+
+    def _toggle_detail_bar(self, symbol):
+        detail_fm = self.detail_frames.get(symbol)
+        if not detail_fm: return
+        
+        if symbol in self.expanded_symbols:
+            self.expanded_symbols.remove(symbol)
+            detail_fm.pack_forget()
+        else:
+            self.expanded_symbols.add(symbol)
+            detail_fm.pack(fill=tk.X)
+            self._render_detail_content(symbol)
+
+    def _render_detail_content(self, symbol):
+        detail_fm = self.detail_frames.get(symbol)
+        if not detail_fm or not detail_fm.winfo_exists(): return
+        
+        for w in detail_fm.winfo_children():
+            w.destroy()
+            
+        if symbol not in self.detail_labels:
+            self.detail_labels[symbol] = {}
+        else:
+            self.detail_labels[symbol].clear()
+            
+        computed = self.data_manager.computed_assets.get(symbol)
+        if not computed: return
+        
+        indicator_configs = [
+            ("MA", "ma20", computed.get("ma20")),
+            ("NAV", "nav", computed.get("nav") if computed.get("type") == "etf" else None),
+            ("SBuy", "strongBuyPrice", computed.get("strongBuyPrice"))
+        ]
+        
+        valid_indicators = [(label, key, val) for label, key, val in indicator_configs if val is not None]
+        if not valid_indicators:
+            return
+            
+        bg_col = detail_fm.cget("bg")
+        
+        pad_lbl = tk.Label(detail_fm, text="   詳細指標:", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg_col)
+        pad_lbl.pack(side=tk.LEFT, padx=2)
+        
+        for label_text, key, val in valid_indicators:
+            display_text = f" {label_text}: {val:.2f} "
+            lbl = tk.Label(detail_fm, text=display_text, font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg_col, cursor="hand2")
+            lbl.pack(side=tk.LEFT, padx=8, pady=2)
+            
+            lbl.indicator_key = key
+            self.detail_labels[symbol][key] = lbl
+            
+            lbl.bind("<Button-1>", lambda e, s=symbol, k=key: self._highlight_detail_label(s, k))
+            
+            if self.highlighted_keys.get(symbol) == key:
+                lbl.config(bg="#e5e5e5", fg="#000000")
 
     def _show_edit_dialog(self, event, symbol, current_ref, stock_cfg):
         # 實現 Toggle 邏輯：按第二次就收回
