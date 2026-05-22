@@ -409,10 +409,26 @@ class HiddenStockWidget(tk.Frame):
         if show_strong_buy:
             indicator_draws.append(("strongBuyPrice", strong_buy, strong_buy))
             
+        # 設定不同指標的線條樣式（寬度與虛線模式）
+        style_map = {
+            "wa5": {"width": 2, "dash": None},               # 週線：實線
+            "ma20": {"width": 2, "dash": (4, 2)},            # 月線：短虛線
+            "nav": {"width": 2, "dash": (2, 4)},             # NAV：長虛線
+            "strongBuyPrice": {"width": 3, "dash": None}    # 強買：較粗實線
+        }
+
         for key, val, val_drawn in indicator_draws:
             if val is not None:
                 x = get_x(val_drawn)
-                canvas.create_line(x, h/2 - 6, x, h/2 + 6, fill=StockStyle.PRIMARY_GREY, width=2)
+                style = style_map.get(key, {"width": 2, "dash": None})
+                if style["dash"]:
+                    canvas.create_line(x, h/2 - 6, x, h/2 + 6,
+                                       fill=StockStyle.PRIMARY_GREY,
+                                       width=style["width"], dash=style["dash"])
+                else:
+                    canvas.create_line(x, h/2 - 6, x, h/2 + 6,
+                                       fill=StockStyle.PRIMARY_GREY,
+                                       width=style["width"])
                 canvas.stock_coords.append({
                     "key": key,
                     "val": val,
