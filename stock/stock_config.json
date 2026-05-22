@@ -10,10 +10,11 @@
             "alert_short": 5.0,
             "alert_long": 75.98,
             "type": "etf",
-            "ma20": 94.5,
+            "ma20": 94.51,
             "low20": 89.95,
             "history_updated_at": "2026-05-22",
-            "nav": 97.45
+            "nav": 97.32,
+            "wa5": 94.72
         },
         {
             "symbol": "otc_00679B",
@@ -22,9 +23,10 @@
             "alert_long": 15.0,
             "type": "etf",
             "ma20": 26.6,
-            "low20": 26.07,
+            "low20": 26.05,
             "history_updated_at": "2026-05-22",
-            "nav": 26.1184
+            "nav": 26.078,
+            "wa5": 26.15
         },
         {
             "symbol": "otc_00687B",
@@ -35,7 +37,8 @@
             "ma20": 27.66,
             "low20": 27.12,
             "history_updated_at": "2026-05-22",
-            "nav": 27.4216
+            "nav": 27.3756,
+            "wa5": 27.24
         },
         {
             "symbol": "tse_2603",
@@ -43,9 +46,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 207.12,
+            "ma20": 207.18,
             "low20": 197.0,
-            "history_updated_at": "2026-05-22"
+            "history_updated_at": "2026-05-22",
+            "wa5": 207.6
         },
         {
             "symbol": "tse_2609",
@@ -53,9 +57,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 49.88,
+            "ma20": 49.91,
             "low20": 48.05,
-            "history_updated_at": "2026-05-22"
+            "history_updated_at": "2026-05-22",
+            "wa5": 50.53
         },
         {
             "symbol": "tse_00635U",
@@ -66,7 +71,8 @@
             "ma20": 48.42,
             "low20": 46.86,
             "history_updated_at": "2026-05-22",
-            "nav": 47.38
+            "nav": 47.3,
+            "wa5": 47.35
         },
         {
             "symbol": "tse_2615",
@@ -74,9 +80,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 77.05,
+            "ma20": 77.08,
             "low20": 74.2,
-            "history_updated_at": "2026-05-22"
+            "history_updated_at": "2026-05-22",
+            "wa5": 80.76
         }
     ]
 }

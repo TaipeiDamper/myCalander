@@ -37,7 +37,7 @@ class StockDataManager:
         # 格式化數值型態參數，避免寫入 string 格式
         formatted_params = {}
         for k, v in params.items():
-            if k in ["ma20", "low20", "nav", "reference"]:
+            if k in ["ma20", "low20", "wa5", "nav", "reference"]:
                 try:
                     formatted_params[k] = float(v) if v not in [None, '', '-'] else None
                 except:
@@ -84,7 +84,7 @@ class StockDataManager:
         threading.Thread(target=task, daemon=True).start()
 
     def fetch_history_yahoo(self, symbol):
-        """抓取 Yahoo Finance 歷史資料並計算 ma20 與 low20"""
+        """抓取 Yahoo Finance 歷史資料並計算 ma20、low20 與 wa5"""
         parts = symbol.split('_')
         if len(parts) < 2: return None
         market, code = parts[0], parts[1]
@@ -108,7 +108,12 @@ class StockDataManager:
                     last_prices = close_prices[-use_days:]
                     ma20 = sum(last_prices) / use_days
                     low20 = min(last_prices)
-                    return round(ma20, 2), round(low20, 2)
+                    
+                    use_days_5 = min(n_days, 5)
+                    last_prices_5 = close_prices[-use_days_5:]
+                    wa5 = sum(last_prices_5) / use_days_5
+                    
+                    return round(ma20, 2), round(low20, 2), round(wa5, 2)
         except Exception as e:
             print(f"Error fetching history for {symbol} via Yahoo: {e}")
         return None
@@ -124,6 +129,7 @@ class StockDataManager:
         last_price = asset.get("lastPrice", 0.0)
         ma20 = asset.get("ma20")
         low20 = asset.get("low20")
+        wa5 = asset.get("wa5")
         nav = asset.get("nav")
 
         premium_discount = None
@@ -180,6 +186,7 @@ class StockDataManager:
             "lastPrice": last_price,
             "ma20": round2(ma20),
             "low20": round2(low20),
+            "wa5": round2(wa5),
             "nav": round2(nav),
             "referencePrice": reference_price,
             "watchPrice": watch_price,
@@ -265,10 +272,10 @@ class StockDataManager:
                 config_changed = True
                 
             last_up = s.get("history_updated_at", "")
-            if not s.get("ma20") or not s.get("low20") or last_up != today_str:
+            if not s.get("ma20") or not s.get("low20") or not s.get("wa5") or last_up != today_str:
                 res_hist = self.fetch_history_yahoo(symbol)
                 if res_hist:
-                    s["ma20"], s["low20"] = res_hist
+                    s["ma20"], s["low20"], s["wa5"] = res_hist
                     s["history_updated_at"] = today_str
                     config_changed = True
                     
@@ -294,6 +301,7 @@ class StockDataManager:
                 "lastPrice": curr,
                 "ma20": s_cfg.get("ma20"),
                 "low20": s_cfg.get("low20"),
+                "wa5": s_cfg.get("wa5"),
                 "nav": s_cfg.get("nav")
             }
             computed = self.compute_asset(asset_data)

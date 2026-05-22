@@ -342,14 +342,30 @@ class HiddenStockWidget(tk.Frame):
         # 獲取 computed 數據
         computed = self.data_manager.computed_assets.get(symbol)
         ma20 = computed.get("ma20") if computed else None
+        wa5 = computed.get("wa5") if computed else None
         nav = computed.get("nav") if (computed and computed.get("type") == "etf") else None
         strong_buy = computed.get("strongBuyPrice") if computed else None
         
-        # 收集所有有值的價格
+        # 判斷 strong_buy 是否在原本的橫線上 (low <= strong_buy <= high)
+        show_strong_buy = False
+        if strong_buy is not None:
+            if low <= strong_buy <= high:
+                show_strong_buy = True
+        
+        # 計算當日波動主體範圍，以進行月線與周線的繪圖限幅
+        base_low = min(prev, curr, low)
+        base_high = max(prev, curr, high)
+        limit_val = prev * 0.10 if prev > 0 else 0
+        
+        ma20_drawn = max(base_low - limit_val, min(base_high + limit_val, ma20)) if ma20 is not None else None
+        wa5_drawn = max(base_low - limit_val, min(base_high + limit_val, wa5)) if wa5 is not None else None
+        
+        # 收集所有有值的價格 (月線與周線使用限幅後的繪圖值，避免拉扁主橫線)
         all_vals = [prev, curr, high, low]
-        if ma20 is not None: all_vals.append(ma20)
+        if ma20_drawn is not None: all_vals.append(ma20_drawn)
+        if wa5_drawn is not None: all_vals.append(wa5_drawn)
         if nav is not None: all_vals.append(nav)
-        if strong_buy is not None: all_vals.append(strong_buy)
+        if show_strong_buy: all_vals.append(strong_buy)
         
         v_low, v_high = min(all_vals), max(all_vals)
         v_range = v_high - v_low
@@ -383,14 +399,19 @@ class HiddenStockWidget(tk.Frame):
             canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
             
         # 繪製有值的指標垂直短線刻度，並記錄在 stock_coords 中
-        indicator_draws = [
-            ("ma20", ma20),
-            ("nav", nav),
-            ("strongBuyPrice", strong_buy)
-        ]
-        for key, val in indicator_draws:
+        indicator_draws = []
+        if wa5 is not None:
+            indicator_draws.append(("wa5", wa5, wa5_drawn))
+        if ma20 is not None:
+            indicator_draws.append(("ma20", ma20, ma20_drawn))
+        if nav is not None:
+            indicator_draws.append(("nav", nav, nav))
+        if show_strong_buy:
+            indicator_draws.append(("strongBuyPrice", strong_buy, strong_buy))
+            
+        for key, val, val_drawn in indicator_draws:
             if val is not None:
-                x = get_x(val)
+                x = get_x(val_drawn)
                 canvas.create_line(x, h/2 - 6, x, h/2 + 6, fill=StockStyle.PRIMARY_GREY, width=2)
                 canvas.stock_coords.append({
                     "key": key,
@@ -406,6 +427,8 @@ class HiddenStockWidget(tk.Frame):
             closest = min(valid_coords, key=lambda c: abs(event.x - c['x']))
             symbol = getattr(canvas, "stock_symbol", None)
             if symbol:
+                if symbol not in self.expanded_symbols:
+                    self._toggle_detail_bar(symbol)
                 self._highlight_detail_label(symbol, closest['key'])
 
     def _hide_temp_val(self, canvas):
@@ -441,6 +464,13 @@ class HiddenStockWidget(tk.Frame):
             self.expanded_symbols.remove(symbol)
             detail_fm.pack_forget()
         else:
+            # 限制同時只能開啟一個：關閉其他所有目前展開的股票
+            for other_sym in list(self.expanded_symbols):
+                other_fm = self.detail_frames.get(other_sym)
+                if other_fm:
+                    other_fm.pack_forget()
+                self.expanded_symbols.discard(other_sym)
+                
             self.expanded_symbols.add(symbol)
             detail_fm.pack(fill=tk.X)
             self._render_detail_content(symbol)
@@ -461,6 +491,7 @@ class HiddenStockWidget(tk.Frame):
         if not computed: return
         
         indicator_configs = [
+            ("WA", "wa5", computed.get("wa5")),
             ("MA", "ma20", computed.get("ma20")),
             ("NAV", "nav", computed.get("nav") if computed.get("type") == "etf" else None),
             ("SBuy", "strongBuyPrice", computed.get("strongBuyPrice"))
