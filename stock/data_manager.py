@@ -131,6 +131,8 @@ class StockDataManager:
         low20 = asset.get("low20")
         wa5 = asset.get("wa5")
         nav = asset.get("nav")
+        high = asset.get("high")
+        low = asset.get("low")
 
         premium_discount = None
         reference_price = None
@@ -184,6 +186,8 @@ class StockDataManager:
             "symbol": symbol,
             "type": asset_type,
             "lastPrice": last_price,
+            "high": round2(high),
+            "low": round2(low),
             "ma20": round2(ma20),
             "low20": round2(low20),
             "wa5": round2(wa5),
@@ -302,7 +306,9 @@ class StockDataManager:
                 "ma20": s_cfg.get("ma20"),
                 "low20": s_cfg.get("low20"),
                 "wa5": s_cfg.get("wa5"),
-                "nav": s_cfg.get("nav")
+                "nav": s_cfg.get("nav"),
+                "high": high,
+                "low": low
             }
             computed = self.compute_asset(asset_data)
             self.computed_assets[symbol] = computed

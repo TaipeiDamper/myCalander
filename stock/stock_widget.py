@@ -364,8 +364,6 @@ class HiddenStockWidget(tk.Frame):
         all_vals = [prev, curr, high, low]
         if ma20_drawn is not None: all_vals.append(ma20_drawn)
         if wa5_drawn is not None: all_vals.append(wa5_drawn)
-        if nav is not None: all_vals.append(nav)
-        if show_strong_buy: all_vals.append(strong_buy)
         
         v_low, v_high = min(all_vals), max(all_vals)
         v_range = v_high - v_low
@@ -381,7 +379,10 @@ class HiddenStockWidget(tk.Frame):
 
         xl, xh, xp, xc = get_x(low), get_x(high), get_x(prev), get_x(curr)
         
-        canvas.stock_coords = []
+        canvas.stock_coords = [
+            {"key": "low", "val": low, "x": xl},
+            {"key": "high", "val": high, "x": xh}
+        ]
         canvas.stock_symbol = symbol
 
         # 軌道
@@ -389,7 +390,7 @@ class HiddenStockWidget(tk.Frame):
         # 端點
         for x in (xl, xh): canvas.create_oval(x-2, h/2-2, x+2, h/2+2, fill="#eeeeee", outline="")
         # 昨收線
-        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.BAR_GUIDE, width=1, dash=(2, 2))
+        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.BAR_GUIDE, width=1)
         
         # 指示器
         if curr != prev:
@@ -404,17 +405,11 @@ class HiddenStockWidget(tk.Frame):
             indicator_draws.append(("wa5", wa5, wa5_drawn))
         if ma20 is not None:
             indicator_draws.append(("ma20", ma20, ma20_drawn))
-        if nav is not None:
-            indicator_draws.append(("nav", nav, nav))
-        if show_strong_buy:
-            indicator_draws.append(("strongBuyPrice", strong_buy, strong_buy))
             
         # 設定不同指標的線條樣式（寬度與虛線模式）
         style_map = {
-            "wa5": {"width": 2, "dash": None},               # 週線：實線
-            "ma20": {"width": 2, "dash": (4, 2)},            # 月線：短虛線
-            "nav": {"width": 2, "dash": (2, 4)},             # NAV：長虛線
-            "strongBuyPrice": {"width": 3, "dash": None}    # 強買：較粗實線
+            "wa5": {"width": 2, "dash": (2, 2)},               # 週線：密集虛線
+            "ma20": {"width": 2, "dash": (6, 2)}            # 月線：寬鬆虛線
         }
 
         for key, val, val_drawn in indicator_draws:
@@ -507,10 +502,10 @@ class HiddenStockWidget(tk.Frame):
         if not computed: return
         
         indicator_configs = [
+            ("最高", "high", computed.get("high")),
+            ("最低", "low", computed.get("low")),
             ("WA", "wa5", computed.get("wa5")),
-            ("MA", "ma20", computed.get("ma20")),
-            ("NAV", "nav", computed.get("nav") if computed.get("type") == "etf" else None),
-            ("SBuy", "strongBuyPrice", computed.get("strongBuyPrice"))
+            ("MA", "ma20", computed.get("ma20"))
         ]
         
         valid_indicators = [(label, key, val) for label, key, val in indicator_configs if val is not None]
