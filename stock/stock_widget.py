@@ -389,15 +389,15 @@ class HiddenStockWidget(tk.Frame):
         canvas.create_line(xl, h/2, xh, h/2, fill=StockStyle.BAR_TRACK, width=4, capstyle=tk.ROUND)
         # 端點
         for x in (xl, xh): canvas.create_oval(x-2, h/2-2, x+2, h/2+2, fill="#eeeeee", outline="")
-        # 昨收線
-        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.BAR_GUIDE, width=1)
+        # 昨日收盤價格 (實線的灰白線)
+        canvas.create_line(xp, 4, xp, h-4, fill="#909090", width=1)
         
-        # 指示器
+        # 現在價格 (指示器：點或三角形，空心灰白外框)
         if curr != prev:
             points = [xc+4, h/2, xc-3, h/2-4, xc-3, h/2+4] if curr > prev else [xc-4, h/2, xc+3, h/2-4, xc+3, h/2+4]
-            canvas.create_polygon(points, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
+            canvas.create_polygon(points, fill="", outline="#909090", width=1)
         else:
-            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="#f0f0f0", outline=StockStyle.PRIMARY_GREY, width=1)
+            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="", outline="#909090", width=1)
             
         # 繪製有值的指標垂直短線刻度，並記錄在 stock_coords 中
         indicator_draws = []
@@ -406,23 +406,33 @@ class HiddenStockWidget(tk.Frame):
         if ma20 is not None:
             indicator_draws.append(("ma20", ma20, ma20_drawn))
             
-        # 設定不同指標的線條樣式（寬度與虛線模式）
+        # 設定不同指標的線條樣式（寬度、顏色與虛線模式）
+        # 實線的灰線是周線，虛線的灰線是月線 (改為更灰白的色系)
         style_map = {
-            "wa5": {"width": 2, "dash": (2, 2)},               # 週線：密集虛線
-            "ma20": {"width": 2, "dash": (6, 2)}            # 月線：寬鬆虛線
+            "wa5": {"width": 1.5, "color": "#d0d0d0", "dash": None},            # 週線：非常淡的灰白實線
+            "ma20": {"width": 1.5, "color": "#a8a8a8", "dash": (2, 2)}          # 月線：較淡的灰白虛線
         }
 
         for key, val, val_drawn in indicator_draws:
             if val is not None:
                 x = get_x(val_drawn)
-                style = style_map.get(key, {"width": 2, "dash": None})
+                style = style_map.get(key, {"width": 2, "color": StockStyle.PRIMARY_GREY, "dash": None})
+                
+                # 週線畫在上半部，月線畫在下半部，以達到明確的空間區隔
+                if key == "wa5":
+                    y1, y2 = h/2 - 7, h/2
+                elif key == "ma20":
+                    y1, y2 = h/2, h/2 + 7
+                else:
+                    y1, y2 = h/2 - 6, h/2 + 6
+
                 if style["dash"]:
-                    canvas.create_line(x, h/2 - 6, x, h/2 + 6,
-                                       fill=StockStyle.PRIMARY_GREY,
+                    canvas.create_line(x, y1, x, y2,
+                                       fill=style["color"],
                                        width=style["width"], dash=style["dash"])
                 else:
-                    canvas.create_line(x, h/2 - 6, x, h/2 + 6,
-                                       fill=StockStyle.PRIMARY_GREY,
+                    canvas.create_line(x, y1, x, y2,
+                                       fill=style["color"],
                                        width=style["width"])
                 canvas.stock_coords.append({
                     "key": key,
