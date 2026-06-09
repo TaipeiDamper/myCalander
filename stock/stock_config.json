@@ -10,11 +10,11 @@
             "alert_short": 5.0,
             "alert_long": 75.98,
             "type": "etf",
-            "ma20": 95.56,
-            "low20": 90.5,
-            "history_updated_at": "2026-05-27",
-            "nav": 103.3,
-            "wa5": 97.93
+            "ma20": 100.15,
+            "low20": 92.5,
+            "history_updated_at": "2026-06-09",
+            "nav": 103.38,
+            "wa5": 104.38
         },
         {
             "symbol": "otc_00679B",
@@ -22,11 +22,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 26.51,
+            "ma20": 26.35,
             "low20": 26.05,
-            "history_updated_at": "2026-05-27",
-            "nav": 26.3148,
-            "wa5": 26.22
+            "history_updated_at": "2026-06-09",
+            "nav": 26.4663,
+            "wa5": 26.46
         },
         {
             "symbol": "otc_00687B",
@@ -34,11 +34,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 27.61,
+            "ma20": 27.58,
             "low20": 27.12,
-            "history_updated_at": "2026-05-27",
-            "nav": 27.6282,
-            "wa5": 27.47
+            "history_updated_at": "2026-06-09",
+            "nav": 27.7804,
+            "wa5": 27.79
         },
         {
             "symbol": "tse_2603",
@@ -46,10 +46,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 208.93,
+            "ma20": 216.43,
             "low20": 197.0,
-            "history_updated_at": "2026-05-27",
-            "wa5": 213.4
+            "history_updated_at": "2026-06-09",
+            "wa5": 230.5
         },
         {
             "symbol": "tse_2609",
@@ -57,10 +57,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 50.22,
+            "ma20": 51.65,
             "low20": 48.05,
-            "history_updated_at": "2026-05-27",
-            "wa5": 51.92
+            "history_updated_at": "2026-06-09",
+            "wa5": 52.96
         },
         {
             "symbol": "tse_00635U",
@@ -68,11 +68,11 @@
             "alert_short": 5.0,
             "alert_long": 10.0,
             "type": "etf",
-            "ma20": 48.24,
-            "low20": 46.86,
-            "history_updated_at": "2026-05-27",
-            "nav": 47.2,
-            "wa5": 47.29
+            "ma20": 47.36,
+            "low20": 45.29,
+            "history_updated_at": "2026-06-09",
+            "nav": 45.33,
+            "wa5": 46.48
         },
         {
             "symbol": "tse_2615",
@@ -80,10 +80,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 78.19,
+            "ma20": 81.39,
             "low20": 74.2,
-            "history_updated_at": "2026-05-27",
-            "wa5": 82.26
+            "history_updated_at": "2026-06-09",
+            "wa5": 84.54
         },
         {
             "symbol": "tse_3231",
@@ -91,10 +91,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 141.07,
+            "ma20": 153.88,
             "low20": 132.5,
-            "wa5": 145.5,
-            "history_updated_at": "2026-05-27"
+            "wa5": 174.1,
+            "history_updated_at": "2026-06-09"
         },
         {
             "symbol": "tse_00403A",
@@ -102,11 +102,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 10.23,
+            "ma20": 10.38,
             "low20": 9.66,
-            "wa5": 10.47,
-            "history_updated_at": "2026-05-27",
-            "nav": 10.99
+            "wa5": 10.57,
+            "history_updated_at": "2026-06-09",
+            "nav": 10.48
         },
         {
             "symbol": "tse_00981A",
@@ -114,11 +114,56 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 29.36,
+            "ma20": 30.21,
             "low20": 27.23,
-            "wa5": 30.91,
-            "history_updated_at": "2026-05-27",
-            "nav": 32.61
+            "wa5": 31.25,
+            "history_updated_at": "2026-06-09",
+            "nav": 31.23
+        },
+        {
+            "symbol": "tse_1773",
+            "reference": 172.0,
+            "alert_short": 5.0,
+            "alert_long": 15.0,
+            "type": "stock",
+            "ma20": 178.82,
+            "low20": 163.5,
+            "wa5": 176.1,
+            "history_updated_at": "2026-06-09"
+        },
+        {
+            "symbol": "otc_6613",
+            "reference": 249.5,
+            "alert_short": 5.0,
+            "alert_long": 15.0,
+            "type": "stock",
+            "ma20": 258.68,
+            "low20": 237.5,
+            "wa5": 258.7,
+            "history_updated_at": "2026-06-09"
+        },
+        {
+            "symbol": "tse_1513",
+            "reference": 169.5,
+            "alert_short": 5.0,
+            "alert_long": 15.0,
+            "type": "stock",
+            "ma20": 163.0,
+            "low20": 148.5,
+            "wa5": 176.2,
+            "history_updated_at": "2026-06-09"
+        },
+        {
+            "symbol": "tse_00646",
+            "reference": 73.35,
+            "alert_short": 5.0,
+            "alert_long": 15.0,
+            "type": "etf",
+            "ma20": 74.14,
+            "low20": 73.05,
+            "wa5": 74.61,
+            "history_updated_at": "2026-06-09",
+            "nav": 73.49
         }
     ]
 }
