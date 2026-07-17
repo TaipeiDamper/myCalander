@@ -127,15 +127,22 @@ class HiddenStockWidget(tk.Frame):
         list_container.grid(row=0, column=0, sticky="nsew")
         
         # 表頭 (代號 基準 昨收 現價 走勢K線 漲跌)
+        # 使用 padx=(7, 2) 對齊內層有邊框的 group_fm 與 item_fm (4 + 1 + 2 = 7px)
         header_fm = tk.Frame(list_container, bg=bg)
-        header_fm.pack(fill=tk.X, side=tk.TOP, padx=2)
+        header_fm.pack(fill=tk.X, side=tk.TOP, padx=(7, 2))
         
-        tk.Label(header_fm, text="代號", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=0, padx=2)
-        tk.Label(header_fm, text="基準", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=1, padx=4)
-        tk.Label(header_fm, text="昨收", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=2, padx=4)
-        tk.Label(header_fm, text="現價", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=3, padx=4)
-        tk.Label(header_fm, text="走勢 K 線", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=12, anchor="center").grid(row=0, column=4, padx=5)
-        tk.Label(header_fm, text="漲跌", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w").grid(row=0, column=5, padx=2)
+        tk.Label(header_fm, text="代號", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=0, padx=2)
+        tk.Label(header_fm, text="基準", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=1, padx=4)
+        tk.Label(header_fm, text="昨收", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=2, padx=4)
+        tk.Label(header_fm, text="現價", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=3, padx=4)
+        
+        # 走勢 K 線對應下方寬度為 80 像素的 Canvas，我們用 80 像素寬 of 容器對齊
+        c4_fm = tk.Frame(header_fm, width=80, height=20, bg=bg)
+        c4_fm.grid(row=0, column=4, padx=5)
+        c4_fm.grid_propagate(False)
+        tk.Label(c4_fm, text="走勢 K 線", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="center").pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(header_fm, text="漲跌", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w").grid(row=0, column=5, padx=2)
 
         # 計算畫布高度
         display_count = min(len(stocks), max_visible)
@@ -259,15 +266,15 @@ class HiddenStockWidget(tk.Frame):
                 sym_lbl.grid(row=0, column=0, padx=2)
                 sym_lbl.bind("<Button-1>", lambda e, s=symbol, r=ref, cfg=stock: self._show_edit_dialog(e, s, r, cfg))
                 
-                ref_lbl = tk.Label(row_fm, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                ref_lbl = tk.Label(row_fm, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
                 ref_lbl.grid(row=0, column=1, padx=4)
                 ref_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
 
-                prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
                 prev_lbl.grid(row=0, column=2, padx=4)
                 prev_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
                 
-                curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
                 curr_lbl.grid(row=0, column=3, padx=4)
                 curr_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
                 
@@ -326,15 +333,15 @@ class HiddenStockWidget(tk.Frame):
             sym_lbl = tk.Label(row_fm, text=name, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
             sym_lbl.grid(row=0, column=0, padx=2)
             
-            ref_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+            ref_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
             ref_lbl.grid(row=0, column=1, padx=4)
             ref_lbl.bind("<Button-1>", lambda e, s=sym: self._toggle_detail_bar(s))
             
-            prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+            prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
             prev_lbl.grid(row=0, column=2, padx=4)
             prev_lbl.bind("<Button-1>", lambda e, s=sym: self._toggle_detail_bar(s))
             
-            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
             curr_lbl.grid(row=0, column=3, padx=4)
             curr_lbl.bind("<Button-1>", lambda e, s=sym: self._toggle_detail_bar(s))
             
