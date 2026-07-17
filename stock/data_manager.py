@@ -12,6 +12,7 @@ class StockDataManager:
         self.config_path = config_path
         self.config_data = self.load_config()
         self.computed_assets = {}
+        self.indices_history = {}
 
     def load_config(self):
         try:
@@ -85,11 +86,13 @@ class StockDataManager:
 
     def fetch_history_yahoo(self, symbol):
         """抓取 Yahoo Finance 歷史資料並計算 ma20、low20 與 wa5"""
-        parts = symbol.split('_')
-        if len(parts) < 2: return None
-        market, code = parts[0], parts[1]
-        suffix = "TW" if market == "tse" else "TWO"
-        yahoo_sym = f"{code}.{suffix}"
+        if '_' in symbol:
+            parts = symbol.split('_')
+            market, code = parts[0], parts[1]
+            suffix = "TW" if market == "tse" else "TWO"
+            yahoo_sym = f"{code}.{suffix}"
+        else:
+            yahoo_sym = symbol
         
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_sym}?range=2mo&interval=1d"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -177,6 +180,7 @@ class StockDataManager:
                 status = "watch"
 
         if asset_type == "etf" and premium_discount is not None:
+            
             if premium_discount > 0.01 and status != "normal":
                 status = "normal"
             elif premium_discount < -0.01 and status == "normal":
@@ -315,7 +319,51 @@ class StockDataManager:
 
         # 5. 檢查預警實例
         alerts = self._check_alerts(updates)
-        return {"updates": updates, "alerts": alerts}
+
+        # 6. 抓取全球參考指標
+        indices = {}
+        index_symbols = {
+            "^N225": "日經",
+            "^KS11": "韓股",
+            "^SOX": "費半",
+            "CL=F": "油價"
+        }
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        for sym, name in index_symbols.items():
+            try:
+                # 取得歷史均線 (MA20 與 WA5)
+                hist = self.indices_history.get(sym)
+                if not hist or hist.get("updated_at") != today_str:
+                    res_hist = self.fetch_history_yahoo(sym)
+                    if res_hist:
+                        ma20, low20, wa5 = res_hist
+                        self.indices_history[sym] = {
+                            "ma20": ma20,
+                            "low20": low20,
+                            "wa5": wa5,
+                            "updated_at": today_str
+                        }
+                
+                url_idx = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1m"
+                req_idx = urllib.request.Request(url_idx, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req_idx, timeout=3) as res_idx:
+                    idx_data = json.loads(res_idx.read().decode('utf-8'))
+                    meta = idx_data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+                    price = meta.get("regularMarketPrice")
+                    prev_close = meta.get("previousClose")
+                    high = meta.get("regularMarketDayHigh", price)
+                    low = meta.get("regularMarketDayLow", price)
+                    price_hint = meta.get("priceHint", 2)
+                    if price is not None and prev_close is not None:
+                        cached = self.indices_history.get(sym, {})
+                        ma20 = cached.get("ma20")
+                        wa5 = cached.get("wa5")
+                        # 回傳格式統一為 (prev, curr, high, low, hint, ma20, wa5)
+                        indices[sym] = (prev_close, price, high, low, price_hint, ma20, wa5)
+            except Exception as e:
+                print(f"Error fetching index {sym}: {e}")
+
+        return {"updates": updates, "alerts": alerts, "indices": indices}
 
     def _check_alerts(self, updates):
         """檢查股票預警：短線看昨收差異，長線看基準價差異"""
