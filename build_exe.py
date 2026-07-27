@@ -22,6 +22,11 @@ def build():
         "--noconsole",
         "--onefile",
         "--name", "SmartCalendar",
+        "--paths", ".",
+        "--collect-submodules", "core",
+        "--collect-submodules", "todo",
+        "--collect-submodules", "stock",
+        "--collect-submodules", "weather",
         "--clean",
         "main.py"
     ]

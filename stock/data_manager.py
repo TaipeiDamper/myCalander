@@ -12,7 +12,6 @@ class StockDataManager:
         self.config_path = config_path
         self.config_data = self.load_config()
         self.computed_assets = {}
-        self.indices_history = {}
 
     def load_config(self):
         try:
@@ -38,7 +37,7 @@ class StockDataManager:
         # 格式化數值型態參數，避免寫入 string 格式
         formatted_params = {}
         for k, v in params.items():
-            if k in ["ma20", "low20", "wa5", "nav", "reference"]:
+            if k in ["ma20", "low20", "wa5", "ma60", "ma120", "nav", "reference"]:
                 try:
                     formatted_params[k] = float(v) if v not in [None, '', '-'] else None
                 except:
@@ -85,16 +84,14 @@ class StockDataManager:
         threading.Thread(target=task, daemon=True).start()
 
     def fetch_history_yahoo(self, symbol):
-        """抓取 Yahoo Finance 歷史資料並計算 ma20、low20 與 wa5"""
-        if '_' in symbol:
-            parts = symbol.split('_')
-            market, code = parts[0], parts[1]
-            suffix = "TW" if market == "tse" else "TWO"
-            yahoo_sym = f"{code}.{suffix}"
-        else:
-            yahoo_sym = symbol
+        """抓取 Yahoo Finance 歷史資料並計算 ma20、low20、wa5、ma60 與 ma120"""
+        parts = symbol.split('_')
+        if len(parts) < 2: return None
+        market, code = parts[0], parts[1]
+        suffix = "TW" if market == "tse" else "TWO"
+        yahoo_sym = f"{code}.{suffix}"
         
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_sym}?range=2mo&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_sym}?range=7mo&interval=1d"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             with urllib.request.urlopen(req, timeout=10) as res:
@@ -115,8 +112,16 @@ class StockDataManager:
                     use_days_5 = min(n_days, 5)
                     last_prices_5 = close_prices[-use_days_5:]
                     wa5 = sum(last_prices_5) / use_days_5
+
+                    use_days_60 = min(n_days, 60)
+                    last_prices_60 = close_prices[-use_days_60:]
+                    ma60 = sum(last_prices_60) / use_days_60
+
+                    use_days_120 = min(n_days, 120)
+                    last_prices_120 = close_prices[-use_days_120:]
+                    ma120 = sum(last_prices_120) / use_days_120
                     
-                    return round(ma20, 2), round(low20, 2), round(wa5, 2)
+                    return round(ma20, 2), round(low20, 2), round(wa5, 2), round(ma60, 2), round(ma120, 2)
         except Exception as e:
             print(f"Error fetching history for {symbol} via Yahoo: {e}")
         return None
@@ -133,6 +138,8 @@ class StockDataManager:
         ma20 = asset.get("ma20")
         low20 = asset.get("low20")
         wa5 = asset.get("wa5")
+        ma60 = asset.get("ma60")
+        ma120 = asset.get("ma120")
         nav = asset.get("nav")
         high = asset.get("high")
         low = asset.get("low")
@@ -195,6 +202,8 @@ class StockDataManager:
             "ma20": round2(ma20),
             "low20": round2(low20),
             "wa5": round2(wa5),
+            "ma60": round2(ma60),
+            "ma120": round2(ma120),
             "nav": round2(nav),
             "referencePrice": reference_price,
             "watchPrice": watch_price,
@@ -280,10 +289,10 @@ class StockDataManager:
                 config_changed = True
                 
             last_up = s.get("history_updated_at", "")
-            if not s.get("ma20") or not s.get("low20") or not s.get("wa5") or last_up != today_str:
+            if not s.get("ma20") or not s.get("low20") or not s.get("wa5") or not s.get("ma60") or not s.get("ma120") or last_up != today_str:
                 res_hist = self.fetch_history_yahoo(symbol)
                 if res_hist:
-                    s["ma20"], s["low20"], s["wa5"] = res_hist
+                    s["ma20"], s["low20"], s["wa5"], s["ma60"], s["ma120"] = res_hist
                     s["history_updated_at"] = today_str
                     config_changed = True
                     
@@ -310,6 +319,8 @@ class StockDataManager:
                 "ma20": s_cfg.get("ma20"),
                 "low20": s_cfg.get("low20"),
                 "wa5": s_cfg.get("wa5"),
+                "ma60": s_cfg.get("ma60"),
+                "ma120": s_cfg.get("ma120"),
                 "nav": s_cfg.get("nav"),
                 "high": high,
                 "low": low
@@ -328,22 +339,8 @@ class StockDataManager:
             "^SOX": "費半",
             "CL=F": "油價"
         }
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
         for sym, name in index_symbols.items():
             try:
-                # 取得歷史均線 (MA20 與 WA5)
-                hist = self.indices_history.get(sym)
-                if not hist or hist.get("updated_at") != today_str:
-                    res_hist = self.fetch_history_yahoo(sym)
-                    if res_hist:
-                        ma20, low20, wa5 = res_hist
-                        self.indices_history[sym] = {
-                            "ma20": ma20,
-                            "low20": low20,
-                            "wa5": wa5,
-                            "updated_at": today_str
-                        }
-                
                 url_idx = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1m"
                 req_idx = urllib.request.Request(url_idx, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req_idx, timeout=3) as res_idx:
@@ -355,11 +352,8 @@ class StockDataManager:
                     low = meta.get("regularMarketDayLow", price)
                     price_hint = meta.get("priceHint", 2)
                     if price is not None and prev_close is not None:
-                        cached = self.indices_history.get(sym, {})
-                        ma20 = cached.get("ma20")
-                        wa5 = cached.get("wa5")
-                        # 回傳格式統一為 (prev, curr, high, low, hint, ma20, wa5)
-                        indices[sym] = (prev_close, price, high, low, price_hint, ma20, wa5)
+                        # 回傳格式統一為 (prev, curr, high, low, hint)
+                        indices[sym] = (prev_close, price, high, low, price_hint)
             except Exception as e:
                 print(f"Error fetching index {sym}: {e}")
 

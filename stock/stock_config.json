@@ -10,10 +10,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 10.74,
-            "low20": 9.77,
-            "wa5": 10.23,
-            "history_updated_at": "2026-07-17",
+            "ma20": 10.59,
+            "low20": 9.52,
+            "wa5": 9.98,
+            "history_updated_at": "2026-07-21",
             "nav": 9.56
         },
         {
@@ -22,11 +22,11 @@
             "alert_short": 5.0,
             "alert_long": 75.98,
             "type": "etf",
-            "ma20": 106.79,
-            "low20": 102.3,
-            "history_updated_at": "2026-07-17",
-            "nav": 100.74,
-            "wa5": 104.96
+            "ma20": 105.58,
+            "low20": 99.2,
+            "history_updated_at": "2026-07-21",
+            "nav": 101.03,
+            "wa5": 102.58
         },
         {
             "symbol": "tse_00635U",
@@ -34,11 +34,11 @@
             "alert_short": 5.0,
             "alert_long": 10.0,
             "type": "etf",
-            "ma20": 42.55,
-            "low20": 41.46,
-            "history_updated_at": "2026-07-17",
-            "nav": 41.53,
-            "wa5": 42.01
+            "ma20": 42.3,
+            "low20": 41.39,
+            "history_updated_at": "2026-07-21",
+            "nav": 41.9,
+            "wa5": 41.85
         },
         {
             "symbol": "tse_00646",
@@ -46,11 +46,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 75.06,
+            "ma20": 75.26,
             "low20": 73.35,
-            "wa5": 76.14,
-            "history_updated_at": "2026-07-17",
-            "nav": 76.5
+            "wa5": 76.28,
+            "history_updated_at": "2026-07-21",
+            "nav": 75.54
         },
         {
             "symbol": "otc_00679B",
@@ -60,9 +60,9 @@
             "type": "etf",
             "ma20": 27.01,
             "low20": 26.73,
-            "history_updated_at": "2026-07-17",
-            "nav": 27.0101,
-            "wa5": 26.79
+            "history_updated_at": "2026-07-21",
+            "nav": 26.861,
+            "wa5": 26.87
         },
         {
             "symbol": "otc_00687B",
@@ -72,9 +72,9 @@
             "type": "etf",
             "ma20": 28.09,
             "low20": 27.78,
-            "history_updated_at": "2026-07-17",
-            "nav": 28.1025,
-            "wa5": 27.85
+            "history_updated_at": "2026-07-21",
+            "nav": 27.9496,
+            "wa5": 27.94
         },
         {
             "symbol": "otc_00719B",
@@ -82,11 +82,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 31.32,
-            "low20": 30.95,
-            "wa5": 31.54,
-            "history_updated_at": "2026-07-17",
-            "nav": 31.7598
+            "ma20": 31.39,
+            "low20": 31.06,
+            "wa5": 31.6,
+            "history_updated_at": "2026-07-21",
+            "nav": 31.4393
         },
         {
             "symbol": "tse_009816",
@@ -94,11 +94,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 15.44,
-            "low20": 14.69,
-            "wa5": 15.09,
-            "history_updated_at": "2026-07-17",
-            "nav": 14.43
+            "ma20": 15.32,
+            "low20": 14.28,
+            "wa5": 14.87,
+            "history_updated_at": "2026-07-21",
+            "nav": 14.54
         },
         {
             "symbol": "tse_00981A",
@@ -106,11 +106,11 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 30.55,
-            "low20": 27.35,
-            "wa5": 28.89,
-            "history_updated_at": "2026-07-17",
-            "nav": 26.71
+            "ma20": 30.1,
+            "low20": 26.43,
+            "wa5": 28.0,
+            "history_updated_at": "2026-07-21",
+            "nav": 26.93
         },
         {
             "symbol": "tse_1513",
@@ -118,10 +118,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 174.32,
-            "low20": 163.5,
-            "wa5": 166.7,
-            "history_updated_at": "2026-07-17"
+            "ma20": 171.88,
+            "low20": 157.5,
+            "wa5": 163.1,
+            "history_updated_at": "2026-07-21"
         },
         {
             "symbol": "tse_1773",
@@ -129,10 +129,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 175.0,
+            "ma20": 173.97,
             "low20": 165.0,
-            "wa5": 179.0,
-            "history_updated_at": "2026-07-17"
+            "wa5": 175.3,
+            "history_updated_at": "2026-07-21"
         },
         {
             "symbol": "tse_2603",
@@ -140,10 +140,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 191.4,
+            "ma20": 192.03,
             "low20": 181.0,
-            "history_updated_at": "2026-07-17",
-            "wa5": 198.1
+            "history_updated_at": "2026-07-21",
+            "wa5": 199.1
         },
         {
             "symbol": "tse_2609",
@@ -151,10 +151,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 51.11,
+            "ma20": 50.85,
             "low20": 48.0,
-            "history_updated_at": "2026-07-17",
-            "wa5": 49.68
+            "history_updated_at": "2026-07-21",
+            "wa5": 49.74
         },
         {
             "symbol": "tse_2615",
@@ -162,10 +162,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 79.47,
+            "ma20": 79.65,
             "low20": 76.7,
-            "history_updated_at": "2026-07-17",
-            "wa5": 80.38
+            "history_updated_at": "2026-07-21",
+            "wa5": 81.22
         },
         {
             "symbol": "tse_3231",
@@ -173,10 +173,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 152.62,
-            "low20": 142.5,
-            "wa5": 144.4,
-            "history_updated_at": "2026-07-17"
+            "ma20": 150.85,
+            "low20": 139.0,
+            "wa5": 144.3,
+            "history_updated_at": "2026-07-21"
         },
         {
             "symbol": "otc_6613",
@@ -184,10 +184,10 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 352.9,
+            "ma20": 346.3,
             "low20": 315.0,
-            "wa5": 357.5,
-            "history_updated_at": "2026-07-17"
+            "wa5": 340.5,
+            "history_updated_at": "2026-07-21"
         }
     ]
 }
