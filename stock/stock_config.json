@@ -10,11 +10,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 10.59,
-            "low20": 9.52,
-            "wa5": 9.98,
-            "history_updated_at": "2026-07-21",
-            "nav": 9.56
+            "ma20": 9.73,
+            "low20": 8.46,
+            "wa5": 9.08,
+            "history_updated_at": "2026-08-05",
+            "nav": 9.86,
+            "ma60": 10.29,
+            "ma120": 10.26
         },
         {
             "symbol": "tse_0050",
@@ -22,11 +24,13 @@
             "alert_short": 5.0,
             "alert_long": 75.98,
             "type": "etf",
-            "ma20": 105.58,
-            "low20": 99.2,
-            "history_updated_at": "2026-07-21",
-            "nav": 101.03,
-            "wa5": 102.58
+            "ma20": 102.33,
+            "low20": 93.5,
+            "history_updated_at": "2026-08-05",
+            "nav": 104.01,
+            "wa5": 99.17,
+            "ma60": 102.75,
+            "ma120": 91.68
         },
         {
             "symbol": "tse_00635U",
@@ -34,11 +38,13 @@
             "alert_short": 5.0,
             "alert_long": 10.0,
             "type": "etf",
-            "ma20": 42.3,
+            "ma20": 42.28,
             "low20": 41.39,
-            "history_updated_at": "2026-07-21",
-            "nav": 41.9,
-            "wa5": 41.85
+            "history_updated_at": "2026-08-05",
+            "nav": 43.32,
+            "wa5": 42.33,
+            "ma60": 44.32,
+            "ma120": 47.71
         },
         {
             "symbol": "tse_00646",
@@ -46,11 +52,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 75.26,
-            "low20": 73.35,
-            "wa5": 76.28,
-            "history_updated_at": "2026-07-21",
-            "nav": 75.54
+            "ma20": 76.14,
+            "low20": 74.8,
+            "wa5": 76.46,
+            "history_updated_at": "2026-08-05",
+            "nav": 78.47,
+            "ma60": 74.86,
+            "ma120": 71.63
         },
         {
             "symbol": "otc_00679B",
@@ -58,11 +66,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 27.01,
-            "low20": 26.73,
-            "history_updated_at": "2026-07-21",
-            "nav": 26.861,
-            "wa5": 26.87
+            "ma20": 26.76,
+            "low20": 26.42,
+            "history_updated_at": "2026-08-05",
+            "nav": 26.7539,
+            "wa5": 26.55,
+            "ma60": 26.7,
+            "ma120": 26.98
         },
         {
             "symbol": "otc_00687B",
@@ -70,11 +80,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 28.09,
-            "low20": 27.78,
-            "history_updated_at": "2026-07-21",
-            "nav": 27.9496,
-            "wa5": 27.94
+            "ma20": 27.84,
+            "low20": 27.51,
+            "history_updated_at": "2026-08-05",
+            "nav": 27.8473,
+            "wa5": 27.63,
+            "ma60": 27.85,
+            "ma120": 28.12
         },
         {
             "symbol": "otc_00719B",
@@ -82,11 +94,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 31.39,
-            "low20": 31.06,
-            "wa5": 31.6,
-            "history_updated_at": "2026-07-21",
-            "nav": 31.4393
+            "ma20": 31.51,
+            "low20": 31.37,
+            "wa5": 31.54,
+            "history_updated_at": "2026-08-05",
+            "nav": 31.5411,
+            "ma60": 31.15,
+            "ma120": 31.17
         },
         {
             "symbol": "tse_009816",
@@ -94,11 +108,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 15.32,
-            "low20": 14.28,
-            "wa5": 14.87,
-            "history_updated_at": "2026-07-21",
-            "nav": 14.54
+            "ma20": 14.71,
+            "low20": 13.35,
+            "wa5": 14.2,
+            "history_updated_at": "2026-08-05",
+            "nav": 15.07,
+            "ma60": 14.89,
+            "ma120": 13.16
         },
         {
             "symbol": "tse_00981A",
@@ -106,11 +122,13 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "etf",
-            "ma20": 30.1,
-            "low20": 26.43,
-            "wa5": 28.0,
-            "history_updated_at": "2026-07-21",
-            "nav": 26.93
+            "ma20": 27.64,
+            "low20": 23.76,
+            "wa5": 25.86,
+            "history_updated_at": "2026-08-05",
+            "nav": 28.58,
+            "ma60": 29.62,
+            "ma120": 25.98
         },
         {
             "symbol": "tse_1513",
@@ -118,10 +136,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 171.88,
-            "low20": 157.5,
-            "wa5": 163.1,
-            "history_updated_at": "2026-07-21"
+            "ma20": 160.12,
+            "low20": 147.0,
+            "wa5": 155.2,
+            "history_updated_at": "2026-08-05",
+            "ma60": 166.02,
+            "ma120": 161.23
         },
         {
             "symbol": "tse_1773",
@@ -129,10 +149,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 173.97,
-            "low20": 165.0,
-            "wa5": 175.3,
-            "history_updated_at": "2026-07-21"
+            "ma20": 164.95,
+            "low20": 146.5,
+            "wa5": 152.1,
+            "history_updated_at": "2026-08-05",
+            "ma60": 172.62,
+            "ma120": 163.4
         },
         {
             "symbol": "tse_2603",
@@ -140,10 +162,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 192.03,
-            "low20": 181.0,
-            "history_updated_at": "2026-07-21",
-            "wa5": 199.1
+            "ma20": 200.95,
+            "low20": 194.5,
+            "history_updated_at": "2026-08-05",
+            "wa5": 204.7,
+            "ma60": 205.06,
+            "ma120": 204.08
         },
         {
             "symbol": "tse_2609",
@@ -151,10 +175,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 50.85,
+            "ma20": 50.46,
             "low20": 48.0,
-            "history_updated_at": "2026-07-21",
-            "wa5": 49.74
+            "history_updated_at": "2026-08-05",
+            "wa5": 50.64,
+            "ma60": 51.2,
+            "ma120": 52.53
         },
         {
             "symbol": "tse_2615",
@@ -162,10 +188,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 79.65,
-            "low20": 76.7,
-            "history_updated_at": "2026-07-21",
-            "wa5": 81.22
+            "ma20": 83.14,
+            "low20": 79.2,
+            "history_updated_at": "2026-08-05",
+            "wa5": 85.34,
+            "ma60": 81.59,
+            "ma120": 79.29
         },
         {
             "symbol": "tse_3231",
@@ -173,10 +201,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 150.85,
+            "ma20": 162.1,
             "low20": 139.0,
-            "wa5": 144.3,
-            "history_updated_at": "2026-07-21"
+            "wa5": 182.0,
+            "history_updated_at": "2026-08-05",
+            "ma60": 157.84,
+            "ma120": 145.67
         },
         {
             "symbol": "otc_6613",
@@ -184,10 +214,12 @@
             "alert_short": 5.0,
             "alert_long": 15.0,
             "type": "stock",
-            "ma20": 346.3,
-            "low20": 315.0,
-            "wa5": 340.5,
-            "history_updated_at": "2026-07-21"
+            "ma20": 312.73,
+            "low20": 256.5,
+            "wa5": 278.1,
+            "history_updated_at": "2026-08-05",
+            "ma60": 305.9,
+            "ma120": 258.95
         }
     ]
 }

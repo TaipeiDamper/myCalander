@@ -96,7 +96,50 @@ class HiddenStockWidget(tk.Frame):
         # 剩下的股票一區
         return "others"
 
+    def _get_dynamic_color(self, target_hex):
+        cfg = self.data_manager.config_data
+        intensity = cfg.get('color_intensity', 1.0)
+        
+        # 獲取實際背景的 RGB 值
+        bg_color = self.master.cget("bg")
+        try:
+            bg_rgb = self.winfo_rgb(bg_color)
+            bg_r, bg_g, bg_b = bg_rgb[0] // 256, bg_rgb[1] // 256, bg_rgb[2] // 256
+        except:
+            bg_r, bg_g, bg_b = 240, 240, 240 # 預設回退
+
+        try:
+            target_rgb = self.winfo_rgb(target_hex)
+            tgt_r, tgt_g, tgt_b = target_rgb[0] // 256, target_rgb[1] // 256, target_rgb[2] // 256
+        except:
+            tgt_r, tgt_g, tgt_b = 168, 168, 168
+
+        # 根據強度的兩個區間進行線性內插
+        if intensity <= 1.0:
+            r = int(bg_r + (tgt_r - bg_r) * intensity)
+            g = int(bg_g + (tgt_g - bg_g) * intensity)
+            b = int(bg_b + (tgt_b - bg_b) * intensity)
+        else:
+            # 2.0 代表完全的純黑 (0, 0, 0)
+            black_r, black_g, black_b = 0, 0, 0
+            factor = intensity - 1.0
+            r = int(tgt_r + (black_r - tgt_r) * factor)
+            g = int(tgt_g + (black_g - tgt_g) * factor)
+            b = int(tgt_b + (black_b - tgt_b) * factor)
+
+        r = min(255, max(0, r))
+        g = min(255, max(0, g))
+        b = min(255, max(0, b))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _update_colors(self):
+        # 根據儲存的強度重新計算全局色彩
+        StockStyle.PRIMARY_GREY = self._get_dynamic_color("#a8a8a8")
+        StockStyle.BAR_TRACK = self._get_dynamic_color("#e0e0e0")
+        StockStyle.BAR_GUIDE = self._get_dynamic_color("#dcdcdc")
+
     def _build_ui(self):
+        self._update_colors()
         for w in self.winfo_children(): w.destroy()
         self.labels.clear()
         self.detail_frames.clear()
@@ -182,14 +225,15 @@ class HiddenStockWidget(tk.Frame):
                     else:
                         child.config(bg=color, fg=StockStyle.PRIMARY_GREY)
 
-        # 定義分區資訊 (去除差異化灰階，全數統一為極淺灰 #e0e0e0)
+        active_border = self._get_dynamic_color("#ebebeb")
+        # 定義分區資訊 (採用動態計算、貼合背景的極淺灰)
         categories = [
-            ("etf", "ETF", "#e0e0e0"),
-            ("bond", "美債", "#e0e0e0"),
-            ("gold", "黃金", "#e0e0e0"),
-            ("shipping", "海運", "#e0e0e0"),
-            ("special", "1513 / 1773 / 6613", "#e0e0e0"),
-            ("others", "其他股票", "#e0e0e0")
+            ("etf", "ETF", active_border),
+            ("bond", "美債", active_border),
+            ("gold", "黃金", active_border),
+            ("shipping", "海運", active_border),
+            ("special", "1513 / 1773 / 6613", active_border),
+            ("others", "其他股票", active_border)
         ]
         
         grouped_stocks = {cat_key: [] for cat_key, _, _ in categories}
@@ -302,8 +346,8 @@ class HiddenStockWidget(tk.Frame):
                     detail_fm.pack(fill=tk.X)
                     self._render_detail_content(symbol)
 
-        # 2. 參考指標區 (放在捲動區最底部，跟股票一併捲動，統一使用極淺灰框 #e0e0e0)
-        indices_container = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground="#e0e0e0")
+        # 2. 參考指標區 (放在捲動區最底部，跟股票一併捲動，統一使用極淺灰框)
+        indices_container = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground=active_border)
         indices_container.pack(fill=tk.X, padx=4, pady=4)
         
         # 分區標題
@@ -485,7 +529,12 @@ class HiddenStockWidget(tk.Frame):
 
     def _draw_status_bar(self, canvas, prev, curr, high, low, symbol):
         canvas.delete("all")
-        w, h = int(canvas.cget("width")), int(canvas.cget("height"))
+        w = canvas.winfo_width()
+        if w <= 1:
+            w = int(canvas.cget("width"))
+        h = canvas.winfo_height()
+        if h <= 1:
+            h = int(canvas.cget("height"))
         
         # 獲取 computed 數據
         computed = self.data_manager.computed_assets.get(symbol)
@@ -553,18 +602,18 @@ class HiddenStockWidget(tk.Frame):
         canvas.create_oval(xl-2, h/2-2, xl+2, h/2+2, fill=color_l, outline="")
         canvas.create_oval(xh-2, h/2-2, xh+2, h/2+2, fill=color_r, outline="")
 
-        # 昨日收盤價格 (柔和灰白實線)
-        canvas.create_line(xp, 4, xp, h-4, fill="#c4c4c4", width=1)
+        # 昨日收盤價格 (隨全局顏色強度動態調整)
+        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.PRIMARY_GREY, width=1)
         
-        # 現在價格 (指示器：點或三角形，填滿柔和灰白色 #a8a8a8)
+        # 現在價格 (指示器：點或三角形，隨全局顏色強度動態調整)
         if curr > prev:
             points = [xc+5, h/2, xc-3, h/2-4, xc-3, h/2+4]
-            canvas.create_polygon(points, fill="#a8a8a8", outline="#a8a8a8")
+            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
         elif curr < prev:
             points = [xc-5, h/2, xc+3, h/2-4, xc+3, h/2+4]
-            canvas.create_polygon(points, fill="#a8a8a8", outline="#a8a8a8")
+            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
         else:
-            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill="#a8a8a8", outline="#a8a8a8")
+            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
             
         # 繪製有值的指標垂直短線刻度，並記錄在 stock_coords 中
         indicator_draws = []
@@ -852,38 +901,41 @@ class HiddenStockWidget(tk.Frame):
         self.active_trigger = trigger_id
         
         dialog.title("全局股票設定")
+        dialog.transient(self.winfo_toplevel())  # 設為基礎介面的子視窗，保持高一層
+        dialog.grab_set()  # 鎖定焦點於此對話框
 
-        # 置中於螢幕 - 調大高度以容納路徑資訊
-        w, h = 260, 320
+        # 置中於螢幕 - 增加寬度與高度以容納滑桿 (Scale)
+        w, h = 280, 360
         sw = dialog.winfo_screenwidth()
         sh = dialog.winfo_screenheight()
         x = (sw - w) // 2
         y = (sh - h) // 2
         dialog.geometry(f"{w}x{h}+{x}+{y}")
-        dialog.attributes("-topmost", True)
-
         
         bg = self.cget("bg")
         tk.Label(dialog, text="全局預設參數", font=StockStyle.FONT_BOLD).pack(pady=10)
         
-        fm = tk.Frame(dialog); fm.pack(padx=20)
+        fm_cfg = tk.Frame(dialog); fm_cfg.pack(padx=20)
         cfg = self.data_manager.config_data
         
-        tk.Label(fm, text="預設短預警(%):").grid(row=0, column=0, sticky="e", pady=2)
-        e_s = tk.Entry(fm, width=8); e_s.insert(0, str(cfg.get('alert_threshold_short', 5.0))); e_s.grid(row=0, column=1)
+        tk.Label(fm_cfg, text="預設短預警(%):").grid(row=0, column=0, sticky="e", pady=2)
+        e_s = tk.Entry(fm_cfg, width=8); e_s.insert(0, str(cfg.get('alert_threshold_short', 5.0))); e_s.grid(row=0, column=1)
         
-        tk.Label(fm, text="預設長預警(%):").grid(row=1, column=0, sticky="e", pady=2)
-        e_l = tk.Entry(fm, width=8); e_l.insert(0, str(cfg.get('alert_threshold_long', 15.0))); e_l.grid(row=1, column=1)
+        tk.Label(fm_cfg, text="預設長預警(%):").grid(row=1, column=0, sticky="e", pady=2)
+        e_l = tk.Entry(fm_cfg, width=8); e_l.insert(0, str(cfg.get('alert_threshold_long', 15.0))); e_l.grid(row=1, column=1)
         
-        tk.Label(fm, text="顏色強度(0-2):").grid(row=2, column=0, sticky="e", pady=2)
-        e_i = tk.Entry(fm, width=8); e_i.insert(0, str(cfg.get('color_intensity', 1.0))); e_i.grid(row=2, column=1)
+        tk.Label(fm_cfg, text="顏色強度滑桿:").grid(row=2, column=0, sticky="e", pady=2)
+        val_i = cfg.get('color_intensity', 1.0)
+        s_i = tk.Scale(fm_cfg, from_=0.0, to=2.0, resolution=0.1, orient=tk.HORIZONTAL, length=80, showvalue=True)
+        s_i.set(val_i)
+        s_i.grid(row=2, column=1, sticky="w", pady=2)
 
         def save():
             try:
                 new_cfg = {
                     "alert_threshold_short": float(e_s.get()),
                     "alert_threshold_long": float(e_l.get()),
-                    "color_intensity": float(e_i.get())
+                    "color_intensity": float(s_i.get())
                 }
                 if self.data_manager.update_global_config(new_cfg):
                     self._build_ui(); self.refresh_prices(); dialog.destroy()
