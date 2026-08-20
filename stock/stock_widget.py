@@ -155,15 +155,31 @@ class HiddenStockWidget(tk.Frame):
         
         # 使用 lambda 與 return "break" 確保事件不會冒泡到父層
         self.bind("<Button-1>", lambda e: self.manual_update(e))
+        
+    def _fmt_price(self, val, hint=2):
+        """格式化數值：一般股票維持自然小數位數（預設 2 位），>=10000 則顯示整數以避免破版"""
+        if val is None or val == "-":
+            return "-"
+        try:
+            val = float(val)
+        except:
+            return str(val)
+        
+        if abs(val) >= 10000:
+            return f"{val:.0f}"
+        elif abs(val) >= 1000:
+            return f"{val:.1f}" if hint <= 1 else f"{val:.2f}"
+        else:
+            return f"{val:.{hint}f}"
 
     def _build_collapsed_ui(self, bg):
         lbl = tk.Label(self, text="·", font=("Arial", 10, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
-        lbl.grid(row=0, column=0, padx=5, pady=2, sticky="e")
-        lbl.bind("<Button-1>", self.toggle_collapse)
+        lbl.grid(row=0, column=0, padx=5, pady=2)
+        lbl.bind("<Button-1>", lambda e: self._toggle_collapse())
 
     def _build_expanded_ui(self, bg):
         stocks = self.data_manager.config_data.get("stocks", [])
-        max_visible = 4 # 回復為 4 檔以節省空間，搭配捲軸查看更多項目
+        max_visible = self.data_manager.config_data.get("max_visible_items", 4)
         item_height = 28 # 每列概估高度
         
         # 建立外層容器以區分布局：清單區 (捲動) 與 控制區 (固定)
@@ -173,21 +189,22 @@ class HiddenStockWidget(tk.Frame):
         list_container = tk.Frame(self, bg=bg)
         list_container.grid(row=0, column=0, sticky="nsew")
         
-        # 表頭 (代號 基準 昨收 現價 走勢K線 漲跌)
+        # 表頭 (代號 std last now K +/-% ) - 與下方資料列 1:1 精準對齊
+        header_right_pad = 16 if len(stocks) > max_visible else 6
         header_fm = tk.Frame(list_container, bg=bg)
-        header_fm.pack(fill=tk.X, side=tk.TOP, padx=(7, 2))
+        header_fm.pack(fill=tk.X, side=tk.TOP, padx=(7, header_right_pad))
         
-        tk.Label(header_fm, text="代號", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=0, padx=2)
-        tk.Label(header_fm, text="基準", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=1, padx=4)
-        tk.Label(header_fm, text="昨收", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=2, padx=4)
-        tk.Label(header_fm, text="現價", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e").grid(row=0, column=3, padx=4)
+        tk.Label(header_fm, text="代號", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=0, padx=1)
+        tk.Label(header_fm, text="std", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=1, padx=2)
+        tk.Label(header_fm, text="last", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=2, padx=2)
+        tk.Label(header_fm, text="now", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e").grid(row=0, column=3, padx=2)
         
-        c4_fm = tk.Frame(header_fm, width=80, height=20, bg=bg)
-        c4_fm.grid(row=0, column=4, padx=5)
+        c4_fm = tk.Frame(header_fm, width=70, height=20, bg=bg)
+        c4_fm.grid(row=0, column=4, padx=3)
         c4_fm.grid_propagate(False)
-        tk.Label(c4_fm, text="走勢 K 線", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="center").pack(fill=tk.BOTH, expand=True)
+        tk.Label(c4_fm, text="K", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="center").pack(fill=tk.BOTH, expand=True)
         
-        tk.Label(header_fm, text="漲跌", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w").grid(row=0, column=5, padx=2)
+        tk.Label(header_fm, text="+/-%", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="w").grid(row=0, column=5, padx=2)
         
         # 計算畫布高度
         display_count = min(len(stocks), max_visible)
@@ -206,8 +223,14 @@ class HiddenStockWidget(tk.Frame):
         self.scroll_frame = tk.Frame(self.canvas, bg=bg)
         self.canvas_window = self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
         
-        # 綁定捲動事件
-        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        # 綁定捲動與寬度自適應事件 (確保 Canvas 寬度自動貼合內部資料列，永不截斷右側 % 欄位)
+        self.scroll_frame.bind(
+            "<Configure>", 
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all"), 
+                width=self.scroll_frame.winfo_reqwidth()
+            )
+        )
 
         def set_item_bg(item_fm, row_fm, detail_fm, symbol, color):
             item_fm.config(bg=color)
@@ -246,39 +269,42 @@ class HiddenStockWidget(tk.Frame):
             else:
                 grouped_stocks["others"].append(stock)
 
-        # 遍歷各分區並渲染
-        for cat_key, cat_title, border_color in categories:
-            cat_stocks = grouped_stocks[cat_key]
-            if not cat_stocks:
-                continue
-                
-            # 建立該分類的框線容器 (使用 highlightthickness=1 產生實線邊框)
-            group_fm = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground=border_color)
-            group_fm.pack(fill=tk.X, padx=4, pady=4)
+        self.index_labels = {}
+        
+        def add_index_row(parent, sym, name):
+            item_fm = tk.Frame(parent, bg=bg)
+            item_fm.pack(fill=tk.X, pady=1, padx=2)
             
-            # 分區標題
-            title_lbl = tk.Label(group_fm, text=cat_title, font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="w")
-            title_lbl.pack(fill=tk.X, padx=6, pady=(4, 2))
+            row_fm = tk.Frame(item_fm, bg=bg)
+            row_fm.pack(fill=tk.X, expand=True)
             
-            for stock in cat_stocks:
-                symbol = stock.get("symbol", "")
-                ref = stock.get("reference", "-")
-                display_sym = symbol.split('_')[-1]
-                
-                # 建立單列容器 (置於 group_fm 內)
-                item_fm = tk.Frame(group_fm, bg=bg)
-                item_fm.pack(fill=tk.X, pady=1, padx=2)
-                
-                row_fm = tk.Frame(item_fm, bg=bg)
-                row_fm.pack(fill=tk.X, expand=True)
-                
-                detail_fm = tk.Frame(item_fm, bg=bg)
-                self.detail_frames[symbol] = detail_fm
-                
-                def make_hover_handlers(i_fm=item_fm, r_fm=row_fm, d_fm=detail_fm, sym=symbol):
+            sym_lbl = tk.Label(row_fm, text=name, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            sym_lbl.grid(row=0, column=0, padx=1)
+            
+            ref_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            ref_lbl.grid(row=0, column=1, padx=2)
+            
+            prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            prev_lbl.grid(row=0, column=2, padx=2)
+            
+            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
+            curr_lbl.grid(row=0, column=3, padx=2)
+            
+            canvas_bar = tk.Canvas(row_fm, width=70, height=24, bg=bg, highlightthickness=0)
+            canvas_bar.grid(row=0, column=4, padx=3)
+            
+            diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="w")
+            diff_lbl.grid(row=0, column=5, padx=2)
+            
+            self.index_labels[sym] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
+
+            detail_fm = tk.Frame(item_fm, bg=bg)
+            self.detail_frames[sym] = detail_fm
+
+            if sym == "^TWII":
+                def make_index_hover(i_fm=item_fm, r_fm=row_fm, d_fm=detail_fm, s=sym):
                     def on_enter(e):
-                        set_item_bg(i_fm, r_fm, d_fm, sym, StockStyle.HOVER_BG)
-                    
+                        set_item_bg(i_fm, r_fm, d_fm, s, StockStyle.HOVER_BG)
                     def on_leave(e):
                         x, y = self.winfo_pointerxy()
                         containing = self.winfo_containing(x, y)
@@ -290,45 +316,109 @@ class HiddenStockWidget(tk.Frame):
                                     is_inside = True
                                     break
                                 p = p.master
-                            if is_inside:
-                                return
-                        set_item_bg(i_fm, r_fm, d_fm, sym, bg)
-                        self._clear_highlights(sym)
+                            if is_inside: return
+                        set_item_bg(i_fm, r_fm, d_fm, s, bg)
+                        self._clear_highlights(s)
                     return on_enter, on_leave
 
-                on_enter, on_leave = make_hover_handlers()
+                on_e, on_l = make_index_hover()
+                for child in row_fm.winfo_children():
+                    if child == sym_lbl:
+                        child.bind("<Enter>", lambda e, w=sym_lbl: (on_e(e), w.config(fg=StockStyle.HOVER_GREY)))
+                        child.bind("<Leave>", lambda e, w=sym_lbl: (on_l(e), w.config(fg=StockStyle.PRIMARY_GREY)))
+                    else:
+                        child.bind("<Enter>", on_e)
+                        child.bind("<Leave>", on_l)
+                    child.bind("<Button-1>", lambda e, s=sym: self._toggle_detail_bar(s))
+
+                if sym in self.expanded_symbols:
+                    detail_fm.pack(fill=tk.X)
+                    self._render_detail_content(sym)
+
+        # 1. 個股分類區
+        for cat_key, cat_title, border_color in categories:
+            cat_stocks = grouped_stocks[cat_key]
+            if not cat_stocks:
+                continue
+                
+            # 建立該分類的框線容器 (使用 highlightthickness=1 產生實線邊框)
+            group_container = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground=border_color)
+            group_container.pack(fill=tk.X, padx=4, pady=4)
+            
+            # 分區標題
+            title_lbl = tk.Label(group_container, text=cat_title, font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="w")
+            title_lbl.pack(fill=tk.X, padx=6, pady=(4, 2))
+            
+            for stock in cat_stocks:
+                symbol = stock["symbol"]
+                ref = stock.get("reference", 0.0)
+                display_sym = symbol.split('_')[-1]
+                
+                # 股票行
+                item_fm = tk.Frame(group_container, bg=bg)
+                item_fm.pack(fill=tk.X, pady=1, padx=2)
+                
+                row_fm = tk.Frame(item_fm, bg=bg)
+                row_fm.pack(fill=tk.X, expand=True)
+
+                detail_fm = tk.Frame(item_fm, bg=bg)
+                self.detail_frames[symbol] = detail_fm
+
+                def make_hover(i_fm=item_fm, r_fm=row_fm, d_fm=detail_fm, s=symbol):
+                    def on_enter(e):
+                        set_item_bg(i_fm, r_fm, d_fm, s, StockStyle.HOVER_BG)
+                    def on_leave(e):
+                        x, y = self.winfo_pointerxy()
+                        containing = self.winfo_containing(x, y)
+                        if containing:
+                            p = containing
+                            is_inside = False
+                            while p:
+                                if p == i_fm:
+                                    is_inside = True
+                                    break
+                                p = p.master
+                            if is_inside: return
+                        set_item_bg(i_fm, r_fm, d_fm, s, bg)
+                        self._clear_highlights(s)
+                    return on_enter, on_leave
+
+                on_enter, on_leave = make_hover()
                 
                 item_fm.bind("<Enter>", on_enter)
                 item_fm.bind("<Leave>", on_leave)
                 row_fm.bind("<Enter>", on_enter)
                 row_fm.bind("<Leave>", on_leave)
-                detail_fm.bind("<Enter>", on_enter)
-                detail_fm.bind("<Leave>", on_leave)
-
-                # 標記 (使用 grid 以維持對齊)
-                row_fm.columnconfigure(4, weight=1) # 讓圖表區有伸縮性
                 
                 sym_lbl = tk.Label(row_fm, text=display_sym, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2", width=6, anchor="e")
-                sym_lbl.grid(row=0, column=0, padx=2)
+                sym_lbl.grid(row=0, column=0, padx=1)
                 sym_lbl.bind("<Button-1>", lambda e, s=symbol, r=ref, cfg=stock: self._show_edit_dialog(e, s, r, cfg))
                 
-                ref_lbl = tk.Label(row_fm, text=str(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e")
-                ref_lbl.grid(row=0, column=1, padx=4)
+                ref_lbl = tk.Label(row_fm, text=self._fmt_price(ref), font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                ref_lbl.grid(row=0, column=1, padx=2)
+                ref_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
 
-                prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e")
-                prev_lbl.grid(row=0, column=2, padx=4)
+                prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                prev_lbl.grid(row=0, column=2, padx=2)
+                prev_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
                 
-                curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e", cursor="hand2")
-                curr_lbl.grid(row=0, column=3, padx=4)
+                curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e", cursor="hand2")
+                curr_lbl.grid(row=0, column=3, padx=2)
                 curr_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
                 
-                canvas_bar = tk.Canvas(row_fm, width=80, height=24, bg=bg, highlightthickness=0, cursor="hand2")
-                canvas_bar.grid(row=0, column=4, padx=5)
+                canvas_bar = tk.Canvas(row_fm, width=70, height=24, bg=bg, highlightthickness=0, cursor="hand2")
+                canvas_bar.grid(row=0, column=4, padx=3)
                 canvas_bar.bind("<Button-1>", lambda e, c=canvas_bar: self._on_bar_click(e, c))
                 canvas_bar.bind("<Leave>", lambda e, c=canvas_bar: self._hide_temp_val(c))
                 
-                diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w")
+                diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="w", cursor="hand2")
                 diff_lbl.grid(row=0, column=5, padx=2)
+                diff_lbl.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
+                
+                self.labels[symbol] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
+                
+                row_fm.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
+                detail_fm.bind("<Button-1>", lambda e, s=symbol: self._toggle_detail_bar(s))
                 
                 # 綁定子元件 hover 事件
                 for child in row_fm.winfo_children():
@@ -338,58 +428,32 @@ class HiddenStockWidget(tk.Frame):
                     else:
                         child.bind("<Enter>", on_enter)
                         child.bind("<Leave>", on_leave)
-                
-                self.labels[symbol] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
-                
-                # 如果原本是展開的，維持展開
+
+                # 初始化已展開項目
                 if symbol in self.expanded_symbols:
                     detail_fm.pack(fill=tk.X)
                     self._render_detail_content(symbol)
 
-        # 2. 參考指標區 (放在捲動區最底部，跟股票一併捲動，統一使用極淺灰框)
-        indices_container = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground=active_border)
-        indices_container.pack(fill=tk.X, padx=4, pady=4)
+        # 2. 其他指標區 (大盤 TW 排在最上方，接著日經、韓股等)
+        other_indices_container = tk.Frame(self.scroll_frame, bg=bg, highlightthickness=1, highlightbackground=active_border)
+        other_indices_container.pack(fill=tk.X, padx=4, pady=4)
         
-        # 分區標題
-        title_lbl = tk.Label(indices_container, text="參考指標", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="w")
-        title_lbl.pack(fill=tk.X, padx=6, pady=(4, 2))
+        other_title_lbl = tk.Label(other_indices_container, text="其他指標", font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg, anchor="w")
+        other_title_lbl.pack(fill=tk.X, padx=6, pady=(4, 2))
         
-        index_symbols = [
+        other_index_symbols = [
+            ("^TWII", "TW"),
             ("^N225", "日經"),
             ("^KS11", "韓股"),
             ("^SOX", "費半"),
-            ("CL=F", "油價")
+            ("CL=F", "油價"),
+            ("USDTWD=X", "美金"),
+            ("EURTWD=X", "歐元"),
+            ("GBPTWD=X", "英鎊"),
+            ("JPYTWD=X", "日幣")
         ]
-        
-        self.index_labels = {}
-        for sym, name in index_symbols:
-            item_fm = tk.Frame(indices_container, bg=bg)
-            item_fm.pack(fill=tk.X, pady=1, padx=2)
-            
-            row_fm = tk.Frame(item_fm, bg=bg)
-            row_fm.pack(fill=tk.X, expand=True)
-            
-            row_fm.columnconfigure(4, weight=1) # 讓圖表區有伸縮性
-            
-            sym_lbl = tk.Label(row_fm, text=name, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=6, anchor="e")
-            sym_lbl.grid(row=0, column=0, padx=2)
-            
-            ref_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e")
-            ref_lbl.grid(row=0, column=1, padx=4)
-            
-            prev_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e")
-            prev_lbl.grid(row=0, column=2, padx=4)
-            
-            curr_lbl = tk.Label(row_fm, text="-", font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg, width=8, anchor="e")
-            curr_lbl.grid(row=0, column=3, padx=4)
-            
-            canvas_bar = tk.Canvas(row_fm, width=80, height=24, bg=bg, highlightthickness=0)
-            canvas_bar.grid(row=0, column=4, padx=5)
-            
-            diff_lbl = tk.Label(row_fm, text="", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, width=7, anchor="w")
-            diff_lbl.grid(row=0, column=5, padx=2)
-            
-            self.index_labels[sym] = (prev_lbl, curr_lbl, canvas_bar, diff_lbl)
+        for sym, name in other_index_symbols:
+            add_index_row(other_indices_container, sym, name)
 
         # 3. 固定控制區 (放在 Grid 的下一列)
         ctrl_container = tk.Frame(self, bg=bg)
@@ -398,11 +462,8 @@ class HiddenStockWidget(tk.Frame):
 
     def _on_mousewheel(self, event):
         """處理滑鼠捲動，僅當滑鼠在小工具上方時觸發"""
-        # 檢查滑鼠是否在小工具範圍內
         x, y = self.winfo_pointerxy()
         widget = self.winfo_containing(x, y)
-        
-        # 如果當前 widget 是本體或其子元件，且 Canvas 存在
         if widget and (str(widget).startswith(str(self))) and hasattr(self, "canvas") and self.canvas.winfo_exists():
             try:
                 self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
@@ -415,21 +476,11 @@ class HiddenStockWidget(tk.Frame):
             ("×", 3, "e", self.toggle_collapse),
             ("↻", 4, "w", self.manual_update)
         ]
-
-        if self.on_notify_toggle:
-            items.append(("🔔", 2, "e", lambda: self.on_notify_toggle()))
-
-        container.columnconfigure(1, weight=1) # 中間留白
-        
-        for text, col, stick, cmd in items:
-            btn = tk.Label(container, text=text, font=("Arial", 10), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
-            btn.grid(row=0, column=col, padx=8, pady=2, sticky=stick)
-            btn.bind("<Button-1>", lambda e, c=cmd: (c(), "break")[1])
-            self._add_hover(btn)
-
-    def _add_hover(self, widget):
-        widget.bind("<Enter>", lambda e: widget.config(fg=StockStyle.HOVER_GREY))
-        widget.bind("<Leave>", lambda e: widget.config(fg=StockStyle.PRIMARY_GREY))
+        for icon, col, anch, cmd in items:
+            lbl = tk.Label(container, text=icon, font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
+            lbl.grid(row=0, column=col, padx=8, pady=2, sticky=anch)
+            lbl.bind("<Button-1>", lambda e, c=cmd: c(e) if callable(c) else None)
+        container.columnconfigure(1, weight=1)
 
     def manual_update(self, event=None):
         """強助手動刷新：重新載入設定、重建 UI、並立即抓取數據"""
@@ -479,33 +530,29 @@ class HiddenStockWidget(tk.Frame):
             if w > 1:
                 self.canvas.itemconfig(self.canvas_window, width=w)
 
-        # 哪怕 fetch 失敗或是處於縮小狀態，也要排程下一次更新，否則功能會「失去」
-        if result and not self.is_collapsed:
-            updates = result.get("updates", {})
-            alerts = result.get("alerts", [])
+        # 哪怕 fetch 失敗或是處於縮小狀態，也要排程下一次更新
+        if not self.is_collapsed:
+            updates = result.get("updates", {}) if result else {}
+            alerts = result.get("alerts", []) if result else []
             
             for sym, data in updates.items():
                 if sym not in self.labels: continue
-                # 注意：data 格式為 (prev, curr, high, low, hint)
-                prev, curr, high, low, hint = data
+                # 注意：data 格式為 (prev, curr, high, low, hint, ...)
+                prev, curr, high, low, hint = data[:5]
                 lbl_prev, lbl_curr, canvas, lbl_diff = self.labels[sym]
                 if not lbl_curr.winfo_exists(): continue
 
-                # 更新文字
-                lbl_prev.config(text=f"{prev:.2f}")
-                lbl_curr.config(text=f"{curr:.{hint}f}")
+                # 更新文字 (保持自然小數，大數自動化為整數)
+                lbl_prev.config(text=self._fmt_price(prev, hint=2))
+                lbl_curr.config(text=self._fmt_price(curr, hint=hint))
                 diff_pct = (curr - prev) / prev * 100 if prev > 0 else 0
                 lbl_diff.config(text=f"{diff_pct:+.2f}%")
 
                 # 繪製圖形
                 self._draw_status_bar(canvas, prev, curr, high, low, sym)
-                
-                # 若處於展開狀態，一併刷新詳細數值列
-                if sym in self.expanded_symbols:
-                    self._render_detail_content(sym)
 
             # 更新全球參考指標
-            indices = result.get("indices", {})
+            indices = result.get("indices", {}) if result else {}
             self.last_indices = indices
             for sym, data in indices.items():
                 if sym not in getattr(self, "index_labels", {}): continue
@@ -513,15 +560,19 @@ class HiddenStockWidget(tk.Frame):
                 lbl_prev, lbl_curr, canvas, lbl_diff = self.index_labels[sym]
                 if not lbl_curr.winfo_exists(): continue
 
-                lbl_prev.config(text=f"{prev:.2f}")
-                lbl_curr.config(text=f"{curr:.{hint}f}")
+                lbl_prev.config(text=self._fmt_price(prev, hint=hint))
+                lbl_curr.config(text=self._fmt_price(curr, hint=hint))
                 diff_pct = (curr - prev) / prev * 100 if prev > 0 else 0
                 lbl_diff.config(text=f"{diff_pct:+.2f}%")
 
                 self._draw_status_bar(canvas, prev, curr, high, low, sym)
 
+            # 刷新所有已展開的詳細面板，防止網路 Timeout 導致詳細指標失效
+            for sym in list(self.expanded_symbols):
+                self._render_detail_content(sym)
+
             # 觸發預警通知
-            if self.on_alert:
+            if self.on_alert and alerts:
                 self.on_alert(alerts)
 
         # 排程下一次自動更新
@@ -529,137 +580,76 @@ class HiddenStockWidget(tk.Frame):
 
     def _draw_status_bar(self, canvas, prev, curr, high, low, symbol):
         canvas.delete("all")
-        w = canvas.winfo_width()
-        if w <= 1:
-            w = int(canvas.cget("width"))
-        h = canvas.winfo_height()
-        if h <= 1:
-            h = int(canvas.cget("height"))
+        # 鎖定畫布固定尺寸 70x24 (避免 winfo_width 受 grid 擠壓而無限放大炸開)
+        w = int(canvas.cget("width"))
+        h = int(canvas.cget("height"))
         
-        # 獲取 computed 數據
+        # 獲取 computed 數據以計算左右側指標總數
         computed = self.data_manager.computed_assets.get(symbol)
-        ma20 = computed.get("ma20") if computed else None
-        wa5 = computed.get("wa5") if computed else None
-        ma60 = computed.get("ma60") if computed else None
-        ma120 = computed.get("ma120") if computed else None
-        nav = computed.get("nav") if (computed and computed.get("type") == "etf") else None
-        strong_buy = computed.get("strongBuyPrice") if computed else None
+        raw_indicators = [
+            ("L", "low", computed.get("low")),
+            ("H", "high", computed.get("high")),
+            ("W", "wa5", computed.get("wa5")),
+            ("M", "ma20", computed.get("ma20")),
+            ("20L", "low20", computed.get("low20")),
+            ("20H", "high20", computed.get("high20")),
+            ("S", "ma60", computed.get("ma60")),
+            ("HY", "ma120", computed.get("ma120"))
+        ] if computed else []
         
-        # 判斷 strong_buy 是否在原本的橫線上 (low <= strong_buy <= high)
-        show_strong_buy = False
-        if strong_buy is not None:
-            if low <= strong_buy <= high:
-                show_strong_buy = True
+        valid_indicators = [(name, key, val) for name, key, val in raw_indicators if val is not None and val > 0]
+        left_count = len([x for x in valid_indicators if x[2] <= curr])
+        right_count = len([x for x in valid_indicators if x[2] > curr])
         
-        # 計算當日波動主體範圍，以進行月線與周線的繪圖限幅
-        base_low = min(prev, curr, low)
-        base_high = max(prev, curr, high)
-        limit_val = prev * 0.10 if prev > 0 else 0
+        # 1. 左右兩側括號數字 (固定錨定於畫布極限邊緣 x=2 與 x=w-2)
+        canvas.create_text(2, h/2, text=f"({left_count})", font=("Arial", 8, "bold"), fill=StockStyle.PRIMARY_GREY, anchor="w")
+        canvas.create_text(w - 2, h/2, text=f"({right_count})", font=("Arial", 8, "bold"), fill=StockStyle.PRIMARY_GREY, anchor="e")
+
+        # 2. 中間動態 K 棒幾何 (限制於 [18px, 52px] 區間，與左右括號保持充裕間距)
+        start_x = 18
+        avail_w = 34
         
-        ma20_drawn = max(base_low - limit_val, min(base_high + limit_val, ma20)) if ma20 is not None else None
-        wa5_drawn = max(base_low - limit_val, min(base_high + limit_val, wa5)) if wa5 is not None else None
-        
-        # 收集所有有值的價格 (月線與周線使用限幅後的繪圖值，避免拉扁主橫線。季線與半年線不納入決定 X 軸比例的計算)
         all_vals = [prev, curr, high, low]
-        if ma20_drawn is not None: all_vals.append(ma20_drawn)
-        if wa5_drawn is not None: all_vals.append(wa5_drawn)
-        
         v_low, v_high = min(all_vals), max(all_vals)
-        v_range = v_high - v_low
-        v_range_pct = (v_range / prev * 100.0) if prev > 0 else 0
-        
-        scale = min(1.0, (v_range_pct / 10.0) ** 0.7) if v_range_pct > 0 else 0.05
-        # 將安全邊距由 12 擴大至 24，防止當現價在最高/最低點時指標被 Canvas 邊界截斷
-        uw = (w - 24) * scale
-        if uw < 10: uw = 10
-        start_x = (w - uw) / 2
+        span = max(v_high - v_low, ((v_high + v_low) / 2.0) * 0.008)
+        center_val = (v_high + v_low) / 2.0
+        v_min = center_val - span / 2.0 * 1.35
+        v_max = center_val + span / 2.0 * 1.35
         
         def get_x(v):
-            return start_x + (v - v_low) / (v_high - v_low) * uw if v_high > v_low else w/2
+            return start_x + (v - v_min) / (v_max - v_min) * avail_w if v_max > v_min else start_x + avail_w / 2.0
 
         xl, xh, xp, xc = get_x(low), get_x(high), get_x(prev), get_x(curr)
         
-        # 確保最低至最高軌道長度不低於 8px，防止單點情況下橫線完全「消失」
-        if xh - xl < 8:
-            diff = (8 - (xh - xl)) / 2
+        if xh - xl < 5:
+            diff = (5 - (xh - xl)) / 2.0
             xl -= diff
             xh += diff
 
         canvas.stock_coords = [
             {"key": "low", "val": low, "x": xl},
-            {"key": "high", "val": high, "x": xh}
+            {"key": "high", "val": high, "x": xh},
+            {"key": "prev", "val": prev, "x": xp},
+            {"key": "curr", "val": curr, "x": xc}
         ]
-        canvas.stock_symbol = symbol
-
-        # 軌道與端點繪製：去除異化色彩，統一為柔和的灰白軌道 (BAR_TRACK)
-        track_w = 2.5  # 軌道寬度定為 2.5px，極簡自然
         
-        canvas.create_line(xl, h/2, xh, h/2, fill=StockStyle.BAR_TRACK, width=track_w, capstyle=tk.ROUND)
-        color_l = StockStyle.BAR_TRACK
-        color_r = StockStyle.BAR_TRACK
-            
-        # 端點
-        canvas.create_oval(xl-2, h/2-2, xl+2, h/2+2, fill=color_l, outline="")
-        canvas.create_oval(xh-2, h/2-2, xh+2, h/2+2, fill=color_r, outline="")
+        # 3. 今日波動幅度橫線 (low ~ high，採用適中清晰柔和灰 #c8c8c8，線寬 2.5px)
+        canvas.create_line(xl, h/2, xh, h/2, fill="#c8c8c8", width=2.5, capstyle=tk.ROUND)
 
-        # 昨日收盤價格 (隨全局顏色強度動態調整)
-        canvas.create_line(xp, 4, xp, h-4, fill=StockStyle.PRIMARY_GREY, width=1)
-        
-        # 現在價格 (指示器：點或三角形，隨全局顏色強度動態調整)
+        # 4. 昨日價垂直線 (xp)
+        canvas.create_line(xp, 2, xp, h-2, fill=StockStyle.PRIMARY_GREY, width=1.5)
+
+        # 5. 現價俐落方向箭頭 (xc)
         if curr > prev:
-            points = [xc+5, h/2, xc-3, h/2-4, xc-3, h/2+4]
-            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
+            points = [xc+4, h/2, xc-3, h/2-3.5, xc-3, h/2+3.5]
+            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline="")
         elif curr < prev:
-            points = [xc-5, h/2, xc+3, h/2-4, xc+3, h/2+4]
-            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
+            points = [xc-4, h/2, xc+3, h/2-3.5, xc+3, h/2+3.5]
+            canvas.create_polygon(points, fill=StockStyle.PRIMARY_GREY, outline="")
         else:
-            canvas.create_oval(xc-3, h/2-3, xc+3, h/2+3, fill=StockStyle.PRIMARY_GREY, outline=StockStyle.PRIMARY_GREY)
-            
-        # 繪製有值的指標垂直短線刻度，並記錄在 stock_coords 中
-        indicator_draws = []
-        if wa5 is not None:
-            indicator_draws.append(("wa5", wa5, wa5_drawn))
-        if ma20 is not None:
-            indicator_draws.append(("ma20", ma20, ma20_drawn))
-        if ma60 is not None and v_low <= ma60 <= v_high:
-            indicator_draws.append(("ma60", ma60, ma60))
-        if ma120 is not None and v_low <= ma120 <= v_high:
-            indicator_draws.append(("ma120", ma120, ma120))
-            
-        # 設定不同指標的線條樣式（統一使用極柔和灰白色彩 #cccccc）
-        style_map = {
-            "wa5": {"width": 1.5, "color": "#cccccc", "dash": None},            # 週線：極淡灰白實線
-            "ma20": {"width": 1.5, "color": "#cccccc", "dash": (2, 2)},         # 月線：極淡灰白密虛線
-            "ma60": {"width": 1.5, "color": "#cccccc", "dash": (4, 4)},         # 季線：極淡灰白疏虛線
-            "ma120": {"width": 1.5, "color": "#cccccc", "dash": (1, 3)}         # 半年線：極淡灰白點線
-        }
+            canvas.create_oval(xc-2, h/2-2, xc+2, h/2+2, fill=StockStyle.PRIMARY_GREY, outline="")
 
-        for key, val, val_drawn in indicator_draws:
-            if val is not None:
-                x = get_x(val_drawn)
-                style = style_map.get(key, {"width": 2, "color": StockStyle.PRIMARY_GREY, "dash": None})
-                
-                # 週線畫在上半部，中長均線均畫在下半部，以達到明確的空間區隔
-                if key == "wa5":
-                    y1, y2 = h/2 - 7, h/2
-                elif key in ["ma20", "ma60", "ma120"]:
-                    y1, y2 = h/2, h/2 + 7
-                else:
-                    y1, y2 = h/2 - 6, h/2 + 6
-
-                if style["dash"]:
-                    canvas.create_line(x, y1, x, y2,
-                                       fill=style["color"],
-                                       width=style["width"], dash=style["dash"])
-                else:
-                    canvas.create_line(x, y1, x, y2,
-                                       fill=style["color"],
-                                       width=style["width"])
-                canvas.stock_coords.append({
-                    "key": key,
-                    "val": val,
-                    "x": x
-                })
+        canvas.stock_symbol = symbol
 
     def _on_bar_click(self, event, canvas):
         if hasattr(canvas, "stock_coords") and canvas.stock_coords:
@@ -678,7 +668,6 @@ class HiddenStockWidget(tk.Frame):
 
     def _highlight_detail_label(self, symbol, key):
         self._clear_highlights(symbol)
-        
         self.highlighted_keys[symbol] = key
         
         labels_map = self.detail_labels.get(symbol, {})
@@ -700,19 +689,27 @@ class HiddenStockWidget(tk.Frame):
 
     def _toggle_detail_bar(self, symbol):
         detail_fm = self.detail_frames.get(symbol)
-        if not detail_fm: return
+        if not detail_fm or not detail_fm.winfo_exists(): return
         
         if symbol in self.expanded_symbols:
-            self.expanded_symbols.remove(symbol)
+            self.expanded_symbols.discard(symbol)
+            self._clear_highlights(symbol)
+            self.highlighted_keys.clear()
+            for w in detail_fm.winfo_children():
+                w.destroy()
             detail_fm.pack_forget()
         else:
-            # 限制同時只能開啟一個：關閉其他所有目前展開的股票
+            # 限制同時只能開啟一個：先關閉所有其他目前展開的股票面板
             for other_sym in list(self.expanded_symbols):
-                other_fm = self.detail_frames.get(other_sym)
-                if other_fm:
-                    other_fm.pack_forget()
                 self.expanded_symbols.discard(other_sym)
+                self._clear_highlights(other_sym)
+                other_fm = self.detail_frames.get(other_sym)
+                if other_fm and other_fm.winfo_exists():
+                    for w in other_fm.winfo_children():
+                        w.destroy()
+                    other_fm.pack_forget()
                 
+            self.highlighted_keys.clear()
             self.expanded_symbols.add(symbol)
             detail_fm.pack(fill=tk.X)
             self._render_detail_content(symbol)
@@ -721,7 +718,7 @@ class HiddenStockWidget(tk.Frame):
         detail_fm = self.detail_frames.get(symbol)
         if not detail_fm or not detail_fm.winfo_exists(): return
         
-        for w in detail_fm.winfo_children():
+        for w in list(detail_fm.winfo_children()):
             w.destroy()
             
         if symbol not in self.detail_labels:
@@ -732,36 +729,104 @@ class HiddenStockWidget(tk.Frame):
         computed = self.data_manager.computed_assets.get(symbol)
         if not computed: return
         
-        indicator_configs = [
-            ("最高", "high", computed.get("high")),
-            ("最低", "low", computed.get("low")),
-            ("WA", "wa5", computed.get("wa5")),
-            ("MA", "ma20", computed.get("ma20")),
-            ("季線", "ma60", computed.get("ma60")),
-            ("半年", "ma120", computed.get("ma120"))
-        ]
-        
-        valid_indicators = [(label, key, val) for label, key, val in indicator_configs if val is not None]
-        if not valid_indicators:
-            return
-            
         bg_col = detail_fm.cget("bg")
+        curr_price = computed.get("lastPrice", 0.0)
+        consec_str = computed.get("consecStr", "")
+
+        def fmt_val(v):
+            return self._fmt_price(v)
+
+        # 收集所有技術指標
+        low_val = computed.get("low")
+        high_val = computed.get("high")
         
-        pad_lbl = tk.Label(detail_fm, text="   詳細指標:", font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg_col)
-        pad_lbl.pack(side=tk.LEFT, padx=2)
+        tech_indicators = [
+            ("W", "wa5", computed.get("wa5")),
+            ("M", "ma20", computed.get("ma20")),
+            ("20L", "low20", computed.get("low20")),
+            ("20H", "high20", computed.get("high20")),
+            ("S", "ma60", computed.get("ma60")),
+            ("HY", "ma120", computed.get("ma120"))
+        ]
+
+        valid_tech = [(name, key, val) for name, key, val in tech_indicators if val is not None and val > 0]
         
-        for label_text, key, val in valid_indicators:
-            display_text = f" {label_text}: {val:.2f} "
-            lbl = tk.Label(detail_fm, text=display_text, font=StockStyle.FONT_BOLD, fg=StockStyle.PRIMARY_GREY, bg=bg_col, cursor="hand2")
-            lbl.pack(side=tk.LEFT, padx=8, pady=2)
-            
+        # 尋找最接近現價的左側指標 X 與右側指標 Y
+        below_tech = [x for x in valid_tech if x[2] <= curr_price]
+        above_tech = [x for x in valid_tech if x[2] > curr_price]
+
+        closest_x = max(below_tech, key=lambda x: x[2]) if below_tech else None
+        closest_y = min(above_tech, key=lambda x: x[2]) if above_tech else None
+
+        # 計算全指標統計總數 (含 L 與 H)
+        all_raw = [("L", "low", low_val), ("H", "high", high_val)] + tech_indicators
+        all_valid = [x for x in all_raw if x[2] is not None and x[2] > 0]
+        left_count = len([x for x in all_valid if x[2] <= curr_price])
+        right_count = len([x for x in all_valid if x[2] > curr_price])
+
+        # 建立外層動態位置帶容器
+        range_bar_fm = tk.Frame(detail_fm, bg=bg_col)
+        range_bar_fm.pack(fill=tk.X, padx=4, pady=3)
+
+        # 列 1：[ L (最左側)  X (近現價左指標)    N (現價)    Y (近現價右指標)  H (最右側) ]
+        row1_fm = tk.Frame(range_bar_fm, bg=bg_col)
+        row1_fm.pack(fill=tk.X, expand=True)
+
+        def add_item_label(parent_fm, name, key, val):
+            disp_txt = f"{name} {fmt_val(val)}"
+            lbl = tk.Label(parent_fm, text=disp_txt, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg_col, cursor="hand2")
+            lbl.pack(side=tk.LEFT, padx=3)
             lbl.indicator_key = key
             self.detail_labels[symbol][key] = lbl
-            
             lbl.bind("<Button-1>", lambda e, s=symbol, k=key: self._highlight_detail_label(s, k))
-            
             if self.highlighted_keys.get(symbol) == key:
                 lbl.config(bg="#e5e5e5", fg="#000000")
+
+        # 左側區域：L (必定最左) + X (最接近現價的左側指標)
+        left_fm = tk.Frame(row1_fm, bg=bg_col)
+        left_fm.pack(side=tk.LEFT, expand=True, anchor="e")
+        
+        if low_val is not None and low_val > 0:
+            add_item_label(left_fm, "L", "low", low_val)
+        if closest_x:
+            add_item_label(left_fm, closest_x[0], closest_x[1], closest_x[2])
+
+        # 中央現價區域：N (包含兩側括號個數)
+        center_fm = tk.Frame(row1_fm, bg=bg_col)
+        center_fm.pack(side=tk.LEFT, padx=3)
+
+        arrow_l = tk.Label(center_fm, text=f"({left_count}) ◄", font=("Arial", 8, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg_col)
+        arrow_l.pack(side=tk.LEFT, padx=1)
+
+        curr_txt = fmt_val(curr_price)
+        curr_lbl = tk.Label(center_fm, text=curr_txt, font=StockStyle.FONT_MAIN, fg=StockStyle.PRIMARY_GREY, bg=bg_col, padx=2, pady=1)
+        curr_lbl.pack(side=tk.LEFT, padx=2)
+
+        arrow_r = tk.Label(center_fm, text=f"► ({right_count})", font=("Arial", 8, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg_col)
+        arrow_r.pack(side=tk.LEFT, padx=1)
+
+        # 右側區域：Y (最接近現價的右側指標) + H (必定最右)
+        right_fm = tk.Frame(row1_fm, bg=bg_col)
+        right_fm.pack(side=tk.LEFT, expand=True, anchor="w")
+
+        if closest_y:
+            add_item_label(right_fm, closest_y[0], closest_y[1], closest_y[2])
+        if high_val is not None and high_val > 0:
+            add_item_label(right_fm, "H", "high", high_val)
+
+        # 列 2：[ 20L    連續趨勢    20H ]
+        low20_val = computed.get("low20")
+        high20_val = computed.get("high20") if computed.get("high20") is not None else computed.get("high")
+        trend_txt = f"Trend: {consec_str}" if consec_str else "Trend: -"
+
+        info_parts = [
+            f"20L: {fmt_val(low20_val)}",
+            trend_txt,
+            f"20H: {fmt_val(high20_val)}"
+        ]
+
+        row2_lbl = tk.Label(range_bar_fm, text="  |  ".join(info_parts), font=StockStyle.FONT_SMALL, fg=StockStyle.PRIMARY_GREY, bg=bg_col)
+        row2_lbl.pack(fill=tk.X, pady=(2, 0))
 
     def _show_edit_dialog(self, event, symbol, current_ref, stock_cfg):
         # 實現 Toggle 邏輯：按第二次就收回
