@@ -14,9 +14,25 @@ import sys
 def get_data_path():
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    # 返回 main.py 所在的根目錄，即 core/..
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATA_FILE = os.path.join(get_data_path(), "todos.json")
+
+
+def _migrate_old_data():
+    old_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "todos.json")
+    new_path = DATA_FILE
+    if os.path.exists(old_path) and os.path.normpath(old_path) != os.path.normpath(new_path):
+        new_size = os.path.getsize(new_path) if os.path.exists(new_path) else 0
+        old_size = os.path.getsize(old_path)
+        if new_size <= 20 and old_size > new_size:
+            try:
+                import shutil
+                shutil.copy(old_path, new_path)
+                print(f"自動遷移舊的任務資料：{old_path} -> {new_path}")
+            except Exception as e:
+                print(f"遷移任務資料失敗: {e}")
 
 
 def load_todos() -> List[Todo]:
@@ -26,6 +42,7 @@ def load_todos() -> List[Todo]:
     Returns:
         Todo 物件列表
     """
+    _migrate_old_data()
     if not os.path.exists(DATA_FILE):
         return []
     

@@ -38,7 +38,7 @@ class CalendarView:
         self.on_date_click = on_date_click
         self.on_edit = on_edit
         self.external_nav_frame = external_nav_frame
-        self.current_date = datetime.now()
+        self.current_date = datetime.now().replace(day=1)
         
         # 建立主框架
         self.frame = ttk.Frame(parent)
@@ -97,14 +97,15 @@ class CalendarView:
         
         # 月曆網格
         self.calendar_frame = ttk.Frame(self.calendar_container)
-        self.calendar_frame.grid(row=1, column=0, sticky="ew", pady=(5, 0))
+        self.calendar_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
         
-        # 設定容器框架的欄位權重，並確保有最小寬度
+        # 設定容器框架的欄位與列權重
         self.calendar_container.columnconfigure(0, weight=1, minsize=700)
+        self.calendar_container.rowconfigure(1, weight=1)
         
         # 今日任務區域
-        self.today_tasks_frame = ttk.LabelFrame(self.paned_window, text="今日任務", padding=10)
-        self.paned_window.add(self.today_tasks_frame, minsize=180) # 加大最小高度以防標題欄位被擠壓到看不到
+        self.today_tasks_frame = ttk.LabelFrame(self.paned_window, text="今日任務", padding=4)
+        self.paned_window.add(self.today_tasks_frame, minsize=130)
         
         self.holidays_cache = {}
         self._fetch_holidays(self.current_date.year)
@@ -152,9 +153,9 @@ class CalendarView:
         """切換到上一個月"""
         old_year = self.current_date.year
         if self.current_date.month == 1:
-            self.current_date = self.current_date.replace(year=self.current_date.year - 1, month=12)
+            self.current_date = self.current_date.replace(year=self.current_date.year - 1, month=12, day=1)
         else:
-            self.current_date = self.current_date.replace(month=self.current_date.month - 1)
+            self.current_date = self.current_date.replace(month=self.current_date.month - 1, day=1)
         self.month_label.config(text=self._get_month_year_str())
         
         if old_year != self.current_date.year:
@@ -166,9 +167,9 @@ class CalendarView:
         """切換到下一個月"""
         old_year = self.current_date.year
         if self.current_date.month == 12:
-            self.current_date = self.current_date.replace(year=self.current_date.year + 1, month=1)
+            self.current_date = self.current_date.replace(year=self.current_date.year + 1, month=1, day=1)
         else:
-            self.current_date = self.current_date.replace(month=self.current_date.month + 1)
+            self.current_date = self.current_date.replace(month=self.current_date.month + 1, day=1)
         self.month_label.config(text=self._get_month_year_str())
         
         if old_year != self.current_date.year:
@@ -182,36 +183,60 @@ class CalendarView:
         for widget in self.calendar_frame.winfo_children():
             widget.destroy()
         
-        # 計算月份的第一天是星期幾
-        # Python weekday(): Monday=0, Tuesday=1, ..., Sunday=6
-        # 現在週日在最左側，所以：Sunday=6 -> 0, Monday=0 -> 1, ..., Saturday=5 -> 6
+        # 計算月份的第一天是星期幾 (Sunday=0, Monday=1, ..., Saturday=6)
         first_day = self.current_date.replace(day=1)
         weekday_python = first_day.weekday()  # Monday=0, Sunday=6
-        # 轉換為週日=0的格式：Sunday(6) -> 0, Monday(0) -> 1, ..., Saturday(5) -> 6
         weekday = (weekday_python + 1) % 7
         
-        # 計算月份有多少天
+        # 計算當前月份天數
         if self.current_date.month == 12:
-            next_month = self.current_date.replace(year=self.current_date.year + 1, month=1, day=1)
+            next_month_first = self.current_date.replace(year=self.current_date.year + 1, month=1, day=1)
         else:
-            next_month = self.current_date.replace(month=self.current_date.month + 1, day=1)
-        days_in_month = (next_month - timedelta(days=1)).day
+            next_month_first = self.current_date.replace(month=self.current_date.month + 1, day=1)
+        days_in_month = (next_month_first - timedelta(days=1)).day
+
+        # 計算上一個月份天數 (用於填充前置連續日期)
+        prev_month_last = first_day - timedelta(days=1)
+        days_in_prev_month = prev_month_last.day
+        
+        # 計算本月總共需要的週數 (5 週或 6 週)
+        total_cells = weekday + days_in_month
+        num_weeks = (total_cells + 6) // 7
         
         # 取得今天的日期
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%d")
         
-        # 建立日期按鈕
         row = 0
         col = 0
         
-        # 填充前面的空白（從第一列開始）
-        for _ in range(weekday):
-            empty_label = ttk.Label(self.calendar_frame, text="", width=12)
-            empty_label.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+        # 1. 填充上個月末的連續日期 (以淺灰/次要文字呈現)
+        for i in range(weekday):
+            prev_day = days_in_prev_month - weekday + 1 + i
+            prev_date_obj = prev_month_last.replace(day=prev_day)
+            prev_date_str = prev_date_obj.strftime("%Y-%m-%d")
+            
+            day_todos = [t for t in self.todos if t.date == prev_date_str]
+            btn_text = str(prev_day)
+            if day_todos:
+                prefix = "✓ " if day_todos[0].completed else ""
+                btn_text += f"\n{prefix}{day_todos[0].title[:6]}"
+                
+            btn = tk.Button(
+                self.calendar_frame,
+                text=btn_text,
+                height=3 if num_weeks >= 6 else 4,
+                command=lambda d=prev_date_str: self.on_date_click(d),
+                relief=tk.FLAT,
+                bg="#fafafa",
+                fg="#bbbbbb",
+                anchor="center",
+                font=("Arial", 9)
+            )
+            btn.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
             col += 1
         
-        # 建立日期按鈕
+        # 2. 建立當月日期按鈕
         for day in range(1, days_in_month + 1):
             date_obj = first_day.replace(day=day)
             date_str = date_obj.strftime("%Y-%m-%d")
@@ -236,18 +261,14 @@ class CalendarView:
                     is_holiday = day_info.get("isHoliday", is_weekend)
                     holiday_desc = day_info.get("description", "")
             
-            # 建立按鈕文字（只顯示日期數字，不顯示英文縮寫）
+            # 建立按鈕文字
             if day_todos:
-                # 排序，讓「未完成」的任務排在最前面顯示
                 day_todos_sorted = sorted(day_todos, key=lambda x: x.completed)
                 first_todo = day_todos_sorted[0]
-                
-                # 判斷是否「全數完成」
                 all_completed = all(t.completed for t in day_todos_sorted)
                 
                 prefix = "✓ " if first_todo.completed else ""
-                # 如果加上 ✓ 前綴，可稍微增加長度
-                btn_text = f"{day}\n{prefix}{first_todo.title[:10]}"
+                btn_text = f"{day}\n{prefix}{first_todo.title[:8]}"
                 
                 if len(day_todos_sorted) > 1:
                     btn_text += f"\n(+{len(day_todos_sorted)-1})"
@@ -255,56 +276,71 @@ class CalendarView:
                 all_completed = False
                 btn_text = str(day)
                 if holiday_desc:
-                    btn_text += f"\n{holiday_desc[:8]}"
+                    btn_text += f"\n{holiday_desc[:6]}"
             
-            # 建立按鈕
+            # 建立按鈕 (6週時自動調整高度為3行以保證完整顯示)
             btn = tk.Button(
                 self.calendar_frame,
                 text=btn_text,
-                height=4,
+                height=3 if num_weeks >= 6 else 4,
                 command=lambda d=date_str: self.on_date_click(d),
                 relief=tk.RAISED,
                 anchor="center",
-                font=("Arial", 10)
+                font=("Arial", 9)
             )
             
-            # 設定顏色
-            text_color = "#d32f2f" if is_holiday else "#000000" # 假日為紅色
+            text_color = "#d32f2f" if is_holiday else "#000000"
             
             if is_today:
-                # 今天是特殊標註（邊框加粗 + 特殊顏色）
-                btn.config(bg="#ffeb3b", fg=text_color, 
-                          relief=tk.SOLID, borderwidth=3)
+                btn.config(bg="#ffeb3b", fg=text_color, relief=tk.SOLID, borderwidth=2)
             elif day_todos:
                 if all_completed:
-                    # 所有任務皆已完成（使用淺綠色並將字體變灰，代表已結案）
                     btn.config(bg="#e8f5e9", fg="#757575")
                 else:
-                    # 還有未完成任務的日期（淺藍色）
                     btn.config(bg="#e3f2fd", fg=text_color)
             else:
-                # 沒有任務的日期（白色/灰色）
-                btn.config(bg="#f5f5f5", fg=text_color)
+                btn.config(bg="#ffffff", fg=text_color)
             
-            btn.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+            btn.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
             
             col += 1
             if col > 6:
                 col = 0
                 row += 1
         
-        # 填充最後一行的空白格子，確保每行都有7個格子
-        while col < 7:
-            empty_label = ttk.Label(self.calendar_frame, text="")
-            empty_label.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+        # 3. 填充下個月初的連續日期 (補齊最後一週)
+        next_day_num = 1
+        while col > 0 and col < 7:
+            next_date_obj = next_month_first.replace(day=next_day_num)
+            next_date_str = next_date_obj.strftime("%Y-%m-%d")
+            
+            day_todos = [t for t in self.todos if t.date == next_date_str]
+            btn_text = str(next_day_num)
+            if day_todos:
+                prefix = "✓ " if day_todos[0].completed else ""
+                btn_text += f"\n{prefix}{day_todos[0].title[:6]}"
+                
+            btn = tk.Button(
+                self.calendar_frame,
+                text=btn_text,
+                height=3 if num_weeks >= 6 else 4,
+                command=lambda d=next_date_str: self.on_date_click(d),
+                relief=tk.FLAT,
+                bg="#fafafa",
+                fg="#bbbbbb",
+                anchor="center",
+                font=("Arial", 9)
+            )
+            btn.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+            next_day_num += 1
             col += 1
         
-        # 設定欄位權重，讓按鈕均勻分佈（與星期標題使用相同的 uniform 名稱以確保對齊）
-        # 確保所有行都使用相同的設定
+        # 設定欄位與行權重，確保按鈕均勻分佈且高度完全適應
         for i in range(7):
             self.calendar_frame.columnconfigure(i, weight=1, uniform="calendar_col")
+        for r in range(row + 1):
+            self.calendar_frame.rowconfigure(r, weight=1)
         
-        # 確保容器框架有最小寬度，避免月份天數少時變窄
         self.calendar_frame.update_idletasks()
         self.calendar_container.update_idletasks()
         
@@ -330,13 +366,17 @@ class CalendarView:
         today_todos_incomplete = sorted(today_todos_incomplete)
         today_todos_completed = sorted(today_todos_completed)
         
-        # 建立主容器（使用 grid 來分上下兩部分）
+        # 建立主容器（在右側預留約 360px 專門給股票小工具懸浮使用）
         main_container = ttk.Frame(self.today_tasks_frame)
-        main_container.pack(fill=tk.BOTH, expand=True)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=(4, 360), pady=2)
+        
+        main_container.rowconfigure(0, weight=1, minsize=45)
+        main_container.rowconfigure(1, weight=1, minsize=45)
+        main_container.columnconfigure(0, weight=1)
         
         # 上半部分：未完成任務
-        incomplete_frame = ttk.LabelFrame(main_container, text="未完成任務", padding=5)
-        incomplete_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        incomplete_frame = ttk.LabelFrame(main_container, text="未完成任務", padding=3)
+        incomplete_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         
         if not today_todos_incomplete:
             no_task_label = ttk.Label(
@@ -344,27 +384,23 @@ class CalendarView:
                 text="沒有待完成的任務",
                 foreground="gray"
             )
-            no_task_label.pack(pady=10)
+            no_task_label.pack(pady=4)
         else:
-            # 建立任務列表框架（含滾動條）
             list_frame = ttk.Frame(incomplete_frame)
             list_frame.pack(fill=tk.BOTH, expand=True)
             
-            # 滾動條
             scrollbar = ttk.Scrollbar(list_frame)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
-            # 任務列表
             task_listbox = tk.Listbox(
                 list_frame,
                 yscrollcommand=scrollbar.set,
-                font=("Arial", 10),
+                font=("Arial", 9),
                 selectmode=tk.SINGLE
             )
             task_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.config(command=task_listbox.yview)
             
-            # 加入未完成任務到列表
             for todo in today_todos_incomplete:
                 time_str = todo.time if todo.time else "全天"
                 task_text = f"[{time_str}] {todo.title}"
@@ -372,15 +408,12 @@ class CalendarView:
                     task_text += f" - {todo.content[:30]}"
                 task_listbox.insert(tk.END, task_text)
                 
-            # 綁定點擊事件
             if self.on_edit:
                 task_listbox.bind("<Double-1>", lambda e: self._on_task_click(e, task_listbox, today_todos_incomplete))
-                # 使用者說「點下去」，保險起見我們也綁定選取事件或其他按鈕，但雙擊是一致的習慣
-                # task_listbox.bind("<<ListboxSelect>>", ...)
         
-        # 下半部分：已完成任務
-        completed_frame = ttk.LabelFrame(main_container, text="已完成任務", padding=5)
-        completed_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        # 下半部分：已完成任務 (位於未完成任務正下方)
+        completed_frame = ttk.LabelFrame(main_container, text="已完成任務", padding=3)
+        completed_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
         
         if not today_todos_completed:
             no_completed_label = ttk.Label(
@@ -388,28 +421,24 @@ class CalendarView:
                 text="沒有已完成的任務",
                 foreground="gray"
             )
-            no_completed_label.pack(pady=10)
+            no_completed_label.pack(pady=4)
         else:
-            # 建立任務列表框架（含滾動條）
             list_frame2 = ttk.Frame(completed_frame)
             list_frame2.pack(fill=tk.BOTH, expand=True)
             
-            # 滾動條
             scrollbar2 = ttk.Scrollbar(list_frame2)
             scrollbar2.pack(side=tk.RIGHT, fill=tk.Y)
             
-            # 任務列表
             task_listbox2 = tk.Listbox(
                 list_frame2,
                 yscrollcommand=scrollbar2.set,
-                font=("Arial", 10),
+                font=("Arial", 9),
                 selectmode=tk.SINGLE,
                 foreground="gray"
             )
             task_listbox2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar2.config(command=task_listbox2.yview)
             
-            # 加入已完成任務到列表
             for todo in today_todos_completed:
                 time_str = todo.time if todo.time else "全天"
                 task_text = f"[{time_str}] ✓ {todo.title}"
@@ -417,14 +446,8 @@ class CalendarView:
                     task_text += f" - {todo.content[:30]}"
                 task_listbox2.insert(tk.END, task_text)
                 
-            # 綁定點擊事件
             if self.on_edit:
                 task_listbox2.bind("<Double-1>", lambda e: self._on_task_click(e, task_listbox2, today_todos_completed))
-        
-        # 設定主容器的行權重
-        main_container.rowconfigure(0, weight=1, minsize=60)
-        main_container.rowconfigure(1, weight=1, minsize=60)
-        main_container.columnconfigure(0, weight=1)
         
     def _on_task_click(self, event, listbox, todo_list):
         """處理列表任務的點擊/雙擊，開啟編輯器"""

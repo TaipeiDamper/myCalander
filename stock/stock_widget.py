@@ -175,7 +175,7 @@ class HiddenStockWidget(tk.Frame):
     def _build_collapsed_ui(self, bg):
         lbl = tk.Label(self, text="·", font=("Arial", 10, "bold"), fg=StockStyle.PRIMARY_GREY, bg=bg, cursor="hand2")
         lbl.grid(row=0, column=0, padx=5, pady=2)
-        lbl.bind("<Button-1>", lambda e: self._toggle_collapse())
+        lbl.bind("<Button-1>", self.toggle_collapse)
 
     def _build_expanded_ui(self, bg):
         stocks = self.data_manager.config_data.get("stocks", [])

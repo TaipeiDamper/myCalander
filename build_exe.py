@@ -47,9 +47,18 @@ def build():
                 dest_path = os.path.join("dist", dest_name)
                 # 邏輯調整：todos.json 保留使用者資料，其餘設定檔則強制覆蓋更新
                 is_config = "config" in dest_name
-                if not os.path.exists(dest_path) or is_config:
+                
+                # 特殊判定：若 todos.json 在 dist 中為空或大小極小，而來源比較大，則仍允許覆蓋複製
+                force_copy = False
+                if dest_name == "todos.json" and os.path.exists(dest_path):
+                    dest_size = os.path.getsize(dest_path)
+                    src_size = os.path.getsize(cfg)
+                    if dest_size <= 20 and src_size > dest_size:
+                        force_copy = True
+
+                if not os.path.exists(dest_path) or is_config or force_copy:
                     shutil.copy(cfg, dest_path)
-                    action = "覆蓋更新" if os.path.exists(dest_path) and is_config else "已複製"
+                    action = "覆蓋更新" if os.path.exists(dest_path) and (is_config or force_copy) else "已複製"
                     print(f"{action}: {cfg} -> dist/{dest_name}")
                 else:
                     print(f"保留現有使用者資料 (不覆蓋): dist/{dest_name}")

@@ -395,7 +395,7 @@ class StockDataManager:
                     pass
                 return sym, None
 
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 results = list(executor.map(fetch_yahoo_live, stocks))
                 for sym, val in results:
                     if sym and val:
